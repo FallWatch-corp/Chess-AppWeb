@@ -1,0 +1,371 @@
+{
+  "labels": [
+    { "name": "feature",  "color": "1d76db", "description": "Nouvelle fonctionnalité (récit utilisateur)" },
+    { "name": "bug",      "color": "d73a4a", "description": "Comportement incorrect" },
+    { "name": "chore",    "color": "c5def5", "description": "Infrastructure, outillage, documentation" },
+    { "name": "auth",     "color": "5319e7", "description": "Connexion GitHub, session, profil joueur" },
+    { "name": "ui",       "color": "fbca04", "description": "Interface React Router" },
+    { "name": "realtime", "color": "0e8a16", "description": "Mise à jour par interrogation périodique de l'API" },
+    { "name": "game",     "color": "b60205", "description": "Parties, coups, fin de partie, Elo" },
+    { "name": "devops",   "color": "006b75", "description": "Docker, CI, déploiement, base SQLite" },
+    { "name": "blocked",  "color": "000000", "description": "Une dépendance n'est pas terminée" }
+  ],
+  "dependLabel": "Dépend de :",
+  "criteresLabel": "Critères d'acceptation",
+  "issues": [
+    {
+      "key": "I1",
+      "titre": "Initialiser le projet (API Express + client React Router)",
+      "recit": "**En tant qu'**équipe technique, **je veux** un squelette de projet avec une API Express et un client React Router en mode framework **afin de** développer tous les récits sur une base commune.",
+      "criteres": [
+        "Depuis un clone neuf, `npm install` puis `npm run dev` démarre l'API et le client (rendu côté serveur activé).",
+        "L'API répond `200` sur `GET /api/health`.",
+        "Le dossier `repository/` existe et est le seul endroit prévu pour le SQL.",
+        "`npm run lint` passe sur le squelette."
+      ],
+      "deps": [],
+      "labels": ["chore", "devops"],
+      "points": 2, "epique": "Infrastructure", "sprint": "1", "moscow": "Must",
+      "branche": "chore/{n}-initialiser-projet"
+    },
+    {
+      "key": "I2",
+      "titre": "Créer le schéma SQLite (joueurs, parties, coups)",
+      "recit": "**En tant qu'**équipe technique, **je veux** une base SQLite (`node:sqlite`) contenant les joueurs, les parties et les coups **afin qu'**une partie survive à un redémarrage du serveur.",
+      "criteres": [
+        "Les tables `joueurs` (id GitHub, nom, elo), `parties` (code, blanc, noir, FEN, statut, résultat, Elo avant/après) et `coups` (partie, ordre, coup) sont créées automatiquement au démarrage si elles n'existent pas.",
+        "Contrainte `CHECK (elo BETWEEN 100 AND 3000)` sur `joueurs` et contrainte d'unicité sur `parties.code`.",
+        "Le chemin du fichier de base est lu dans la variable d'environnement `DATABASE_PATH`.",
+        "Tout le SQL se trouve dans `repository/` ; aucune requête ailleurs.",
+        "Après un redémarrage du serveur, une partie en cours est retrouvée avec sa FEN et sa liste de coups."
+      ],
+      "deps": ["I1"],
+      "labels": ["chore", "devops"],
+      "points": 3, "epique": "Infrastructure", "sprint": "1", "moscow": "Must",
+      "branche": "chore/{n}-schema-sqlite"
+    },
+    {
+      "key": "I3",
+      "titre": "Mettre en place les tests d'intégration de l'API",
+      "recit": "**En tant qu'**équipe technique, **je veux** un environnement de tests d'intégration de l'API **afin de** vérifier chaque récit contre une vraie base SQLite.",
+      "criteres": [
+        "`npm test` lance les tests d'intégration (ex. `node:test` + `supertest`) sur une base SQLite temporaire, isolée par fichier de test.",
+        "Un utilitaire permet de simuler un joueur connecté sans passer par GitHub.",
+        "Un test d'exemple sur `GET /api/health` passe."
+      ],
+      "deps": ["I1", "I2"],
+      "labels": ["chore", "devops"],
+      "points": 2, "epique": "Infrastructure", "sprint": "1", "moscow": "Must",
+      "branche": "chore/{n}-tests-integration-api"
+    },
+    {
+      "key": "I4",
+      "titre": "Exécuter les tests en CI à chaque push sur main",
+      "recit": "**En tant qu'**équipe technique, **je veux** que les tests s'exécutent automatiquement à chaque `push` sur `main` **afin de** détecter une régression avant la publication.",
+      "criteres": [
+        "`.github/workflows/ci.yml` se déclenche à chaque `push` sur `main` et sur les pull requests.",
+        "Le job installe les dépendances et exécute `npm test`.",
+        "Un test en échec rend la CI rouge."
+      ],
+      "deps": ["I3"],
+      "labels": ["chore", "devops"],
+      "points": 2, "epique": "Infrastructure", "sprint": "1", "moscow": "Must",
+      "branche": "chore/{n}-ci-tests-main"
+    },
+    {
+      "key": "I5",
+      "titre": "Conteneuriser l'API et le client",
+      "recit": "**En tant qu'**équipe technique, **je veux** des images Docker pour l'API et le client **afin de** lancer l'application sur n'importe quelle machine avec Docker.",
+      "criteres": [
+        "Un `Dockerfile` multi-étapes pour l'API et un pour le client ; les images de production n'embarquent pas les dépendances de développement.",
+        "Le fichier SQLite est écrit dans un répertoire prévu pour un volume Docker (ex. `/data`).",
+        "Aucun secret n'est copié dans les images (`.dockerignore` exclut `.env`).",
+        "Un `compose.yml` de développement démarre l'application complète en local."
+      ],
+      "deps": ["I2"],
+      "labels": ["chore", "devops"],
+      "points": 3, "epique": "Infrastructure", "sprint": "2", "moscow": "Must",
+      "branche": "chore/{n}-conteneuriser-api-client"
+    },
+    {
+      "key": "I6",
+      "titre": "Publier les images sur ghcr.io depuis la CI",
+      "recit": "**En tant qu'**équipe technique, **je veux** que la CI publie les images sur ghcr.io quand les tests passent **afin de** déployer une version testée.",
+      "criteres": [
+        "Si les tests passent sur `main`, la CI construit et pousse les images de l'API et du client sur `ghcr.io`.",
+        "Chaque image est taguée `latest` et `sha-<commit court>`.",
+        "Si les tests échouent, aucune image n'est publiée."
+      ],
+      "deps": ["I4", "I5"],
+      "labels": ["chore", "devops"],
+      "points": 2, "epique": "Infrastructure", "sprint": "3", "moscow": "Must",
+      "branche": "chore/{n}-publier-images-ghcr"
+    },
+    {
+      "key": "I7",
+      "titre": "Déployer avec deploy/compose.yml et .env",
+      "recit": "**En tant qu'**équipe technique, **je veux** un `deploy/compose.yml` basé sur les images publiées **afin de** démarrer l'application sur une machine où il n'y a que Docker.",
+      "criteres": [
+        "`deploy/compose.yml` utilise `image:` (jamais `build:`) ; le compte et le tag sont lus dans `deploy/.env`.",
+        "Un volume nommé conserve le fichier SQLite entre les redémarrages des conteneurs.",
+        "`deploy/.env.example` liste toutes les variables attendues (compte, tag, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, URL publique) avec des valeurs d'exemple.",
+        "`deploy/.env` est exclu du dépôt (`.gitignore`) ; aucun secret n'est versionné.",
+        "`docker compose up -d` dans `deploy/` démarre l'application sur une machine vierge."
+      ],
+      "deps": ["I6"],
+      "labels": ["chore", "devops"],
+      "points": 2, "epique": "Infrastructure", "sprint": "3", "moscow": "Must",
+      "branche": "chore/{n}-deploy-compose-env"
+    },
+    {
+      "key": "I8",
+      "titre": "Rédiger le README (développement et déploiement)",
+      "recit": "**En tant qu'**équipe technique, **je veux** un README complet **afin que** n'importe qui puisse démarrer l'application en développement et en production.",
+      "criteres": [
+        "Le README explique le démarrage en développement : prérequis, création de l'application GitHub OAuth, variables d'environnement, commandes.",
+        "Il explique le démarrage sur la machine de déploiement avec `deploy/compose.yml` et `deploy/.env`.",
+        "Il explique comment lancer les tests."
+      ],
+      "deps": ["I7"],
+      "labels": ["chore", "devops"],
+      "points": 1, "epique": "Infrastructure", "sprint": "3", "moscow": "Must",
+      "branche": "chore/{n}-readme-dev-deploiement"
+    },
+    {
+      "key": "I9",
+      "titre": "Se connecter avec GitHub",
+      "recit": "**En tant que** joueur, **je veux** me connecter avec mon compte GitHub **afin de** jouer sous mon identité.",
+      "criteres": [
+        "Le bouton « Se connecter avec GitHub » lance le flux OAuth et me ramène dans l'application, connecté.",
+        "La session est conservée dans un cookie signé `httpOnly` ; la clé de session vient de l'environnement.",
+        "Un refus ou une erreur OAuth affiche un message clair et je reste déconnecté.",
+        "Une route protégée de l'API appelée sans session répond `401`.",
+        "L'identifiant et le secret de l'application OAuth sont lus dans l'environnement, jamais dans le dépôt."
+      ],
+      "deps": ["I2"],
+      "labels": ["feature", "auth"],
+      "points": 3, "epique": "Comptes", "sprint": "1", "moscow": "Must",
+      "branche": "feature/{n}-connexion-github"
+    },
+    {
+      "key": "I10",
+      "titre": "Créer mon profil joueur à la première connexion",
+      "recit": "**En tant que** joueur, **je veux** qu'un profil avec mon nom et un classement Elo de 1000 soit créé à ma première connexion **afin d'**être identifié et classé.",
+      "criteres": [
+        "À ma première connexion, un joueur est créé avec mon nom GitHub et un Elo de 1000.",
+        "Aux connexions suivantes, mon profil existant est réutilisé : pas de doublon, Elo conservé.",
+        "Mon nom et mon Elo s'affichent dans l'en-tête une fois connecté.",
+        "`GET /api/moi` renvoie mon nom et mon Elo, ou `401` si je ne suis pas connecté."
+      ],
+      "deps": ["I9"],
+      "labels": ["feature", "auth"],
+      "points": 2, "epique": "Comptes", "sprint": "1", "moscow": "Must",
+      "branche": "feature/{n}-profil-premiere-connexion"
+    },
+    {
+      "key": "I11",
+      "titre": "Se déconnecter",
+      "recit": "**En tant que** joueur, **je veux** me déconnecter **afin de** libérer mon compte sur un poste partagé.",
+      "criteres": [
+        "Le bouton « Se déconnecter » détruit ma session et me ramène à l'accueil.",
+        "Après la déconnexion, `GET /api/moi` répond `401`."
+      ],
+      "deps": ["I9"],
+      "labels": ["feature", "auth"],
+      "points": 1, "epique": "Comptes", "sprint": "3", "moscow": "Should",
+      "branche": "feature/{n}-deconnexion"
+    },
+    {
+      "key": "I12",
+      "titre": "Créer une partie privée et recevoir un code",
+      "recit": "**En tant que** joueur, **je veux** créer une partie privée et recevoir un code **afin d'**inviter la personne de mon choix.",
+      "criteres": [
+        "Je clique « Créer une partie » et je reçois un code court affiché avec un bouton pour le copier.",
+        "Le code est généré aléatoirement côté serveur et est unique (contrainte d'unicité sur `parties.code`).",
+        "La partie est enregistrée au statut « en attente » avec la FEN de la position initiale.",
+        "Un visiteur non connecté ne peut pas créer de partie (`401`)."
+      ],
+      "deps": ["I10"],
+      "labels": ["feature", "game"],
+      "points": 3, "epique": "Parties privées", "sprint": "1", "moscow": "Must",
+      "branche": "feature/{n}-creer-partie-code"
+    },
+    {
+      "key": "I13",
+      "titre": "Rejoindre une partie avec un code",
+      "recit": "**En tant que** joueur, **je veux** entrer un code et rejoindre la partie **afin de** jouer contre la personne qui me l'a donné.",
+      "criteres": [
+        "Je saisis un code valide et j'arrive sur l'échiquier de la partie.",
+        "Les couleurs sont tirées au sort côté serveur au moment où je rejoins.",
+        "Un code inconnu est refusé (`404`) avec le message « Aucune partie ne correspond à ce code. »",
+        "Un code déjà utilisé est refusé (`409`) avec le message « Ce code a déjà été utilisé. »",
+        "Je ne peux pas rejoindre ma propre partie (`403`) : « Vous ne pouvez pas jouer contre vous-même. »",
+        "Si deux joueurs rejoignent en même temps, un seul réussit (mise à jour conditionnelle `WHERE statut = 'en_attente'`)."
+      ],
+      "deps": ["I12"],
+      "labels": ["feature", "game"],
+      "points": 3, "epique": "Parties privées", "sprint": "2", "moscow": "Must",
+      "branche": "feature/{n}-rejoindre-partie-code"
+    },
+    {
+      "key": "I14",
+      "titre": "Voir l'arrivée de mon adversaire dans la salle d'attente",
+      "recit": "**En tant que** joueur, **je veux** être amené automatiquement à l'échiquier quand mon adversaire rejoint ma partie **afin de** ne pas avoir à recharger la page.",
+      "criteres": [
+        "La page d'attente interroge l'API périodiquement (ex. toutes les 2 s) sur l'état de la partie.",
+        "Dès que l'adversaire a rejoint, je suis redirigé vers l'échiquier avec ma couleur.",
+        "L'interrogation s'arrête quand je quitte la page."
+      ],
+      "deps": ["I13"],
+      "labels": ["feature", "realtime", "ui"],
+      "points": 2, "epique": "Parties privées", "sprint": "2", "moscow": "Must",
+      "branche": "feature/{n}-attente-adversaire-polling"
+    },
+    {
+      "key": "I15",
+      "titre": "Afficher l'échiquier d'une partie",
+      "recit": "**En tant que** joueur, **je veux** voir l'échiquier de ma partie avec ma couleur en bas **afin de** savoir où en est la partie.",
+      "criteres": [
+        "La page de la partie est rendue côté serveur à partir de la FEN stockée en base.",
+        "L'échiquier est orienté selon ma couleur ; les noms et les Elo des deux joueurs sont affichés.",
+        "Le joueur qui a le trait est indiqué.",
+        "Un joueur qui ne participe pas à la partie reçoit `403` ; une partie inexistante renvoie `404`."
+      ],
+      "deps": ["I13"],
+      "labels": ["feature", "game", "ui"],
+      "points": 3, "epique": "Jeu", "sprint": "2", "moscow": "Must",
+      "branche": "feature/{n}-afficher-echiquier"
+    },
+    {
+      "key": "I16",
+      "titre": "Jouer un coup quand c'est mon tour",
+      "recit": "**En tant que** joueur, **je veux** jouer un coup quand c'est mon tour **afin de** faire avancer la partie.",
+      "criteres": [
+        "Je déplace une pièce ; le coup est envoyé à `POST /api/parties/:id/coups`.",
+        "Le serveur valide le coup avec `chess.js` à partir de la FEN en base, puis enregistre la nouvelle FEN et ajoute le coup à la liste dans une même transaction.",
+        "Un coup illégal est refusé (`422`) et la pièce revient à sa place.",
+        "Un coup hors tour est refusé (`409`) : « Ce n'est pas votre tour. »",
+        "Un coup dans une partie terminée est refusé (`409`) : « La partie est terminée. »",
+        "Un joueur qui ne participe pas à la partie reçoit `403`.",
+        "Le README justifie le choix de `chess.js` et explique son intégration (validation côté serveur, FEN et coups en base)."
+      ],
+      "deps": ["I15"],
+      "labels": ["feature", "game"],
+      "points": 3, "epique": "Jeu", "sprint": "2", "moscow": "Must",
+      "branche": "feature/{n}-jouer-coup-tour"
+    },
+    {
+      "key": "I17",
+      "titre": "Voir le coup de mon adversaire sans recharger",
+      "recit": "**En tant que** joueur, **je veux** voir le coup de mon adversaire apparaître sur mon échiquier **afin de** ne pas avoir à m'en occuper.",
+      "criteres": [
+        "Pendant la partie, le client interroge `GET /api/parties/:id` périodiquement (ex. toutes les 1 à 2 s).",
+        "Le coup de l'adversaire apparaît sur mon échiquier sans action de ma part.",
+        "L'interrogation s'arrête quand la partie est terminée ou que je quitte la page.",
+        "Aucun WebSocket : la mise à jour passe uniquement par l'API."
+      ],
+      "deps": ["I16"],
+      "labels": ["feature", "realtime"],
+      "points": 2, "epique": "Jeu", "sprint": "2", "moscow": "Must",
+      "branche": "feature/{n}-coup-adversaire-polling"
+    },
+    {
+      "key": "I18",
+      "titre": "Calculer le nouveau classement Elo",
+      "recit": "**En tant que** joueur, **je veux** que mon classement soit recalculé selon la formule Elo **afin qu'**il reflète ma force.",
+      "criteres": [
+        "`attendu(A) = 1 / (1 + 10 ** ((eloB - eloA) / 400))` et `nouvelElo(A) = eloA + 20 * (score(A) - attendu(A))`.",
+        "`score(A)` vaut 1, 0,5 ou 0 selon que A gagne, annule ou perd.",
+        "Le résultat est arrondi à l'entier le plus proche, puis ramené dans l'intervalle 100 à 3000.",
+        "Des tests couvrent : 1000 contre 1000, victoire → 1010 ; un joueur à 100 qui perd reste à 100 ; un joueur à 3000 qui gagne reste à 3000."
+      ],
+      "deps": ["I3"],
+      "labels": ["feature", "game"],
+      "points": 2, "epique": "Fin de partie et classement", "sprint": "2", "moscow": "Must",
+      "branche": "feature/{n}-calcul-elo"
+    },
+    {
+      "key": "I19",
+      "titre": "Terminer la partie par mat ou pat",
+      "recit": "**En tant que** joueur, **je veux** que la partie se termine automatiquement sur un mat ou un pat **afin que** le résultat et les classements soient enregistrés sans intervention.",
+      "criteres": [
+        "Après chaque coup, le serveur détecte le mat avec `chess.js` : le joueur qui mate gagne.",
+        "Le pat termine la partie par une nulle.",
+        "Le statut, le résultat et les deux nouveaux Elo sont enregistrés dans la même transaction que le dernier coup.",
+        "Les classements ne sont mis à jour qu'une seule fois par partie.",
+        "Tout coup ultérieur est refusé (`409`)."
+      ],
+      "deps": ["I16", "I18"],
+      "labels": ["feature", "game"],
+      "points": 3, "epique": "Fin de partie et classement", "sprint": "3", "moscow": "Must",
+      "branche": "feature/{n}-fin-mat-pat"
+    },
+    {
+      "key": "I20",
+      "titre": "Abandonner la partie en cours",
+      "recit": "**En tant que** joueur, **je veux** abandonner la partie en cours **afin de** ne pas laisser mon adversaire attendre un coup qui ne viendra jamais.",
+      "criteres": [
+        "Un bouton « Abandonner », avec confirmation, est disponible pendant la partie, que ce soit mon tour ou non.",
+        "La partie est perdue pour moi et gagnée pour mon adversaire ; les deux Elo sont mis à jour.",
+        "Abandonner une partie déjà terminée est refusé (`409`) ; un joueur qui ne participe pas reçoit `403`.",
+        "Mon adversaire voit l'abandon grâce à l'interrogation périodique."
+      ],
+      "deps": ["I17", "I18"],
+      "labels": ["feature", "game"],
+      "points": 3, "epique": "Fin de partie et classement", "sprint": "3", "moscow": "Must",
+      "branche": "feature/{n}-abandonner-partie"
+    },
+    {
+      "key": "I21",
+      "titre": "Voir le résultat et les classements mis à jour",
+      "recit": "**En tant que** joueur, **je veux** voir le résultat et les deux classements mis à jour quand la partie se termine **afin de** connaître l'effet de la partie sur mon Elo.",
+      "criteres": [
+        "À la fin de la partie (mat, nulle ou abandon), les deux joueurs voient le résultat (victoire, défaite ou nulle) et sa cause.",
+        "Les Elo des deux joueurs sont affichés avant → après (ex. 1000 → 1010).",
+        "L'échiquier n'accepte plus aucun coup."
+      ],
+      "deps": ["I19", "I20"],
+      "labels": ["feature", "ui"],
+      "points": 2, "epique": "Fin de partie et classement", "sprint": "3", "moscow": "Must",
+      "branche": "feature/{n}-resultat-fin-partie"
+    },
+    {
+      "key": "I22",
+      "titre": "Voir l'historique de mes parties",
+      "recit": "**En tant que** joueur, **je veux** voir l'historique de mes parties terminées **afin de** suivre l'évolution de mon classement.",
+      "criteres": [
+        "La page d'historique, rendue côté serveur, liste mes parties terminées, de la plus récente à la plus ancienne.",
+        "Pour chaque partie : adversaire, ma couleur, résultat, cause (mat, nulle, abandon), variation de mon Elo et date.",
+        "Seules mes parties apparaissent ; les parties en attente ou en cours sont exclues.",
+        "Un visiteur non connecté est redirigé vers la connexion (`401` côté API)."
+      ],
+      "deps": ["I19", "I20"],
+      "labels": ["feature", "ui"],
+      "points": 3, "epique": "Historique", "sprint": "3", "moscow": "Must",
+      "branche": "feature/{n}-historique-parties"
+    },
+    {
+      "key": "I23",
+      "titre": "Détecter la nulle par répétition, matériel insuffisant ou 50 coups",
+      "recit": "**En tant que** joueur, **je veux** que la partie soit déclarée nulle par répétition, matériel insuffisant ou règle des cinquante coups **afin de** respecter toutes les règles officielles.",
+      "criteres": [
+        "Le serveur détecte ces trois cas avec `chess.js` à partir de la liste des coups en base (la répétition exige l'historique, pas seulement la FEN).",
+        "La partie se termine par une nulle et les deux Elo sont mis à jour.",
+        "La cause exacte de la nulle est affichée dans le résultat et l'historique."
+      ],
+      "deps": ["I19"],
+      "labels": ["feature", "game"],
+      "points": 1, "epique": "Fin de partie et classement", "sprint": "—", "moscow": "Could",
+      "branche": "feature/{n}-nulle-regles-avancees"
+    }
+  ],
+  "wont": [
+    "WebSocket / Server-Sent Events (l'énoncé impose l'interrogation périodique)",
+    "Recherche d'adversaire publique (matchmaking)",
+    "Pendule / contrôle du temps",
+    "Proposition de nulle entre joueurs",
+    "Spectateurs d'une partie",
+    "Partie contre l'ordinateur",
+    "Clavardage entre joueurs"
+  ]
+}
