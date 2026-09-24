@@ -1,22 +1,28 @@
-FROM node:24-alpine AS development-dependencies-env
-COPY . /app
+FROM node:24-alpine AS dependances
 WORKDIR /app
-RUN npm ci
+COPY package.json package-lock.json ./
+COPY client/package.json ./client/package.json
+COPY server/package.json ./server/package.json
+RUN npm ci --workspace=client
 
-FROM node:24-alpine AS production-dependencies-env
-COPY ./package.json package-lock.json /app/
+FROM node:24-alpine AS build
 WORKDIR /app
-RUN npm ci --omit=dev
+COPY --from=dependances /app/node_modules ./node_modules
+COPY client ./client
+RUN npm run build --workspace=client
 
-FROM node:24-alpine AS build-env
-COPY . /app/
-COPY --from=development-dependencies-env /app/node_modules /app/node_modules
+FROM node:24-alpine AS dependances-prod
 WORKDIR /app
-RUN npm run build
+COPY package.json package-lock.json ./
+COPY client/package.json ./client/package.json
+COPY server/package.json ./server/package.json
+RUN npm ci --workspace=client --omit=dev
 
 FROM node:24-alpine
-COPY ./package.json package-lock.json /app/
-COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/build /app/build
 WORKDIR /app
-CMD ["npm", "run", "start"]
+COPY --from=dependances-prod /app/node_modules ./node_modules
+COPY --from=build /app/client/build ./client/build
+COPY client/package.json ./client/package.json
+
+EXPOSE 3000
+CMD ["npm", "run", "start", "--workspace=client"]
