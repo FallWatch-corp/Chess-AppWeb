@@ -1,0 +1,38 @@
+name: Vérifier compose.yml
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Démarrer la stack (docker compose up)
+        run: docker compose up --build -d
+
+      - name: Vérifier que l'API répond
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health && exit 0
+            sleep 2
+          done
+          echo "API injoignable après 60s" && exit 1
+
+      - name: Vérifier que le client répond
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:5173/ && exit 0
+            sleep 2
+          done
+          echo "Client injoignable après 60s" && exit 1
+
+      - name: Logs des conteneurs (si échec)
+        if: failure()
+        run: docker compose logs
+
+      - name: Arrêter la stack
+        if: always()
+        run: docker compose down
