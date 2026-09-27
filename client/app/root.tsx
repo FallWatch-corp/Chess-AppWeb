@@ -8,7 +8,12 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { obtenirJoueurConnecte } from "./api.server";
 import "./app.css";
+
+export async function loader({ request }: Route.LoaderArgs) {
+  return { joueur: await obtenirJoueurConnecte(request) };
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -25,7 +30,7 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -41,8 +46,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
-  return <Outlet />;
+export default function App({ loaderData }: Route.ComponentProps) {
+  const { joueur } = loaderData;
+
+  return (
+    <>
+      <header className="flex items-center justify-between border-b px-4 py-3">
+        <span className="font-semibold">Chess-AppWeb</span>
+        {joueur ? (
+          <span>
+            {joueur.nom} · <span className="font-mono">Elo {joueur.elo}</span>
+          </span>
+        ) : (
+          <span className="text-gray-500">Non connecté</span>
+        )}
+      </header>
+      <Outlet />
+    </>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
