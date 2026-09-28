@@ -1,16 +1,19 @@
 CREATE TABLE IF NOT EXISTS joueurs (
-  id   INTEGER PRIMARY KEY,
-  nom  TEXT NOT NULL,
-  elo  INTEGER NOT NULL DEFAULT 1000 CHECK (elo BETWEEN 100 AND 3000)
+  id         INTEGER PRIMARY KEY,
+  github_id  INTEGER NOT NULL UNIQUE,
+  nom        TEXT NOT NULL,
+  elo        INTEGER NOT NULL DEFAULT 1000 CHECK (elo BETWEEN 100 AND 3000)
 );
 
 CREATE TABLE IF NOT EXISTS parties (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   code              TEXT NOT NULL UNIQUE,
+  createur          INTEGER NOT NULL REFERENCES joueurs(id),
   blanc             INTEGER REFERENCES joueurs(id),
   noir              INTEGER REFERENCES joueurs(id),
   fen               TEXT NOT NULL,
-  statut            TEXT NOT NULL DEFAULT 'en_attente',
+  statut            TEXT NOT NULL DEFAULT 'en_attente'
+                    CHECK (statut IN ('en_attente', 'en_cours', 'terminee')),
   resultat          TEXT,
   elo_blanc_avant   INTEGER,
   elo_blanc_apres   INTEGER,
