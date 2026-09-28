@@ -4,23 +4,11 @@ const { utiliserBaseTemporaire } = require('./helpers/base-temporaire.js');
 
 utiliserBaseTemporaire();
 
-const express = require('express');
 const request = require('supertest');
 const app = require('../app.js');
 const db = require('../repository/db.js');
 const { trouverOuCreerJoueur } = require('../repository/joueurs.js');
-
-// Simule une session ouverte par le callback OAuth, indépendamment du
-// mécanisme de session choisi (cookie signé) : seul req.session.joueurId compte.
-function appConnectee(joueurId) {
-  const enveloppe = express();
-  enveloppe.use((req, res, next) => {
-    req.session = { joueurId };
-    next();
-  });
-  enveloppe.use(app);
-  return enveloppe;
-}
+const { appConnectee } = require('./helpers/session.js');
 
 test('la première connexion crée un joueur avec un Elo de 1000', () => {
   const joueur = trouverOuCreerJoueur({ githubId: 101, nom: 'alice' });
@@ -48,7 +36,7 @@ test('GET /api/moi sans session répond 401', async () => {
 });
 
 test('GET /api/moi avec une session vers un joueur inexistant répond 401', async () => {
-  const reponse = await request(appConnectee(999999)).get('/api/moi');
+  const reponse = await request(appConnectee(app, 999999)).get('/api/moi');
 
   assert.equal(reponse.status, 401);
 });
@@ -56,7 +44,7 @@ test('GET /api/moi avec une session vers un joueur inexistant répond 401', asyn
 test('GET /api/moi connecté renvoie mon nom et mon Elo', async () => {
   const joueur = trouverOuCreerJoueur({ githubId: 303, nom: 'carole' });
 
-  const reponse = await request(appConnectee(joueur.id)).get('/api/moi');
+  const reponse = await request(appConnectee(app, joueur.id)).get('/api/moi');
 
   assert.equal(reponse.status, 200);
   assert.deepEqual(reponse.body, { nom: 'carole', elo: 1000 });

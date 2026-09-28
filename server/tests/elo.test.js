@@ -13,9 +13,9 @@ test('1000 contre 1000 : victoire → 1010, nulle → 1000, défaite → 990', (
 });
 
 test('le résultat est arrondi à l\'entier le plus proche', () => {
-  // attendu(1200, 1000) ≈ 0,7597 → 1200 + 20 × 0,2403 ≈ 1204,8 → 1205
+  // calculé a la main : 1204,8 donc arrondi a 1205
   assert.equal(nouvelElo(1200, 1000, 1), 1205);
-  // 1000 + 20 × (0 − 0,2403) ≈ 995,19 → 995
+  // et 995,19 donc arrondi a 995
   assert.equal(nouvelElo(1000, 1200, 0), 995);
 });
 

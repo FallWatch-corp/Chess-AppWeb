@@ -1,7 +1,7 @@
 const { trouverJoueurParId } = require('../repository/joueurs.js');
 
-// Le callback OAuth (#9) place l'id du joueur dans req.session.joueurId.
-// On relit le joueur en base à chaque requête : l'Elo affiché est toujours à jour.
+// joueurId est mis dans la session après la connexion GitHub.
+// On va chercher le joueur dans la base à chaque fois pour avoir le bon Elo.
 function exigerConnexion(req, res, next) {
   const joueurId = req.session?.joueurId;
   const joueur = joueurId ? trouverJoueurParId(joueurId) : undefined;

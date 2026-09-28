@@ -1,5 +1,5 @@
-// Appels à l'API Express depuis les loaders et actions (côté serveur seulement).
-// Le cookie de session du navigateur est transmis pour que l'API reconnaisse le joueur.
+// Pour appeler notre API depuis les loaders et les actions.
+// On renvoie le cookie du navigateur sinon l'API ne sait pas qui est connecté.
 const API_URL = process.env.API_URL ?? "http://localhost:3000";
 
 export function appelerApi(
