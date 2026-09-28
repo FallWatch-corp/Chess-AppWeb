@@ -1,8 +1,7 @@
 const db = require('./db.js');
 
-// Une seule requête : crée le joueur à sa première connexion (Elo 1000 par
-// défaut du schéma), sinon réutilise la ligne existante sans toucher à l'Elo.
-// Le nom est rafraîchi au cas où le login GitHub aurait changé.
+// Si le joueur n'existe pas on le crée (elo 1000 par défaut dans le schéma).
+// S'il existe deja on garde son elo et on met juste son nom a jour.
 const upsertParGithubId = db.prepare(`
   INSERT INTO joueurs (github_id, nom) VALUES (?, ?)
   ON CONFLICT (github_id) DO UPDATE SET nom = excluded.nom
