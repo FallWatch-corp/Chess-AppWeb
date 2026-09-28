@@ -3,7 +3,12 @@ import { redirect } from "react-router";
 import type { Route } from "./+types/partie";
 import { appelerApi } from "../api.server";
 
-type Partie = { id: number; code: string; statut: string };
+type Partie = {
+  id: number;
+  code: string;
+  statut: string;
+  couleur: "blanc" | "noir" | null;
+};
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Partie privée · Chess-AppWeb" }];
@@ -23,6 +28,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export default function PagePartie({ loaderData }: Route.ComponentProps) {
   const { partie } = loaderData;
+
+  // l'échiquier va remplacer ça plus tard
+  if (partie.statut !== "en_attente") {
+    return (
+      <main className="container mx-auto flex flex-col items-center gap-6 p-8">
+        <h1 className="text-2xl font-semibold">La partie a commencé</h1>
+        <p>Vous jouez les {partie.couleur === "blanc" ? "blancs" : "noirs"}.</p>
+      </main>
+    );
+  }
 
   return (
     <main className="container mx-auto flex flex-col items-center gap-6 p-8">
