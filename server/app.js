@@ -9,7 +9,9 @@ const app = express();
 
 app.use(express.json());
 app.use((req, res, next) => {
-  req.session = readSession(req);
+  if (!req.session) {
+    req.session = readSession(req);
+  }
   next();
 });
 
