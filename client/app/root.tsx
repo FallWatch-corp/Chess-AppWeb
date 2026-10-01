@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useSearchParams,
 } from "react-router";
 
 import type { Route } from "./+types/root";
@@ -12,7 +13,13 @@ import { obtenirJoueurConnecte } from "./api.server";
 import "./app.css";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  return { joueur: await obtenirJoueurConnecte(request) };
+  // le bouton de connexion envoie le navigateur directement sur l'API,
+  // donc il faut l'adresse publique de l'API (pas celle dans Docker)
+  const urlApi = process.env.URL_API ?? "http://localhost:3000";
+  return {
+    joueur: await obtenirJoueurConnecte(request),
+    urlConnexion: `${urlApi}/api/auth/login`,
+  };
 }
 
 export const links: Route.LinksFunction = () => [
@@ -47,7 +54,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App({ loaderData }: Route.ComponentProps) {
-  const { joueur } = loaderData;
+  const { joueur, urlConnexion } = loaderData;
+  // l'API nous renvoie ici avec ?erreur=connexion si la connexion GitHub a raté
+  const [parametres] = useSearchParams();
+  const connexionRatee = parametres.get("erreur") === "connexion" && !joueur;
 
   return (
     <>
@@ -58,9 +68,19 @@ export default function App({ loaderData }: Route.ComponentProps) {
             {joueur.nom} · <span className="font-mono">Elo {joueur.elo}</span>
           </span>
         ) : (
-          <span className="text-gray-500">Non connecté</span>
+          <a
+            href={urlConnexion}
+            className="rounded bg-gray-900 px-3 py-1.5 text-white hover:bg-gray-700"
+          >
+            Se connecter avec GitHub
+          </a>
         )}
       </header>
+      {connexionRatee && (
+        <p role="alert" className="bg-red-50 px-4 py-3 text-center text-red-700">
+          La connexion avec GitHub a été annulée ou a échoué. Vous pouvez réessayer.
+        </p>
+      )}
       <Outlet />
     </>
   );

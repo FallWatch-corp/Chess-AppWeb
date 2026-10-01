@@ -7,6 +7,13 @@ services:
       - "3000:3000"
     volumes:
       - donnees_sqlite:/data
+    # les secrets sont lus dans un fichier .env à côté de ce compose.yml (pas dans le dépôt)
+    environment:
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET}
+      URL_API: http://localhost:3000
+      URL_CLIENT: http://localhost:5173
 
   client:
     build:
@@ -16,6 +23,7 @@ services:
       - "5173:3000"
     environment:
       API_URL: http://server:3000
+      URL_API: http://localhost:3000
     depends_on:
       - server
 
