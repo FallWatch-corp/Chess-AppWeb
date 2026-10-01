@@ -2,6 +2,7 @@ import { useState } from "react";
 import { redirect } from "react-router";
 import type { Route } from "./+types/partie";
 import { appelerApi } from "../api.server";
+import { useInterrogation } from "../hooks/useInterrogation";
 
 type Partie = {
   id: number;
@@ -28,6 +29,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export default function PagePartie({ loaderData }: Route.ComponentProps) {
   const { partie } = loaderData;
+
+  // tant qu'on attend l'adversaire on redemande l'état de la partie toutes les 2 s
+  useInterrogation(partie.statut === "en_attente");
 
   // l'échiquier va remplacer ça plus tard
   if (partie.statut !== "en_attente") {
