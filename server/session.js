@@ -1,7 +1,6 @@
 const { createHmac, timingSafeEqual } = require('node:crypto');
 
 const COOKIE_NAME = 'chess_session';
-const SECRET = process.env.SESSION_SECRET ?? 'developpement-seulement';
 const DUREE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function signSession(session) {
@@ -25,19 +24,26 @@ function verifySession(value) {
   }
 }
 
+// Pas de valeur par défaut : sans la clé, n'importe qui pourrait fabriquer un cookie valide
 function signature(data) {
-  return createHmac('sha256', SECRET).update(data).digest('base64url');
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error('SESSION_SECRET manque dans les variables d\'environnement.');
+  return createHmac('sha256', secret).update(data).digest('base64url');
 }
 
-function readSession(req) {
+function readCookie(req, nom) {
   const cookies = Object.fromEntries(
     (req.headers.cookie ?? '').split(';').map((p) => p.trim().split('=')).filter(([n]) => n),
   );
-  return verifySession(cookies[COOKIE_NAME]);
+  return cookies[nom];
+}
+
+function readSession(req) {
+  return verifySession(readCookie(req, COOKIE_NAME));
 }
 
 function writeSession(res, session) {
   res.cookie(COOKIE_NAME, signSession(session), { httpOnly: true, sameSite: 'lax', maxAge: DUREE_MS, path: '/' });
 }
 
-module.exports = { readSession, writeSession };
+module.exports = { readSession, writeSession, readCookie, COOKIE_NAME };
