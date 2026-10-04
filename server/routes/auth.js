@@ -1,7 +1,7 @@
 const express = require('express');
 const { randomBytes } = require('node:crypto');
 const { trouverOuCreerJoueur } = require('../repository/joueurs.js');
-const { writeSession, readCookie } = require('../session.js');
+const { writeSession, clearSession, readCookie } = require('../session.js');
 
 const router = express.Router();
 
@@ -70,6 +70,12 @@ router.get('/callback', async (req, res) => {
     console.error(erreur);
     retourAvecErreur(res);
   }
+});
+
+// POST et pas GET : sinon une simple image <img src=".../logout"> sur un autre site déconnecterait le joueur
+router.post('/logout', (req, res) => {
+  clearSession(res);
+  res.redirect(303, process.env.URL_CLIENT);
 });
 
 module.exports = router;

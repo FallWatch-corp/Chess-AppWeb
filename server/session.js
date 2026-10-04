@@ -46,4 +46,10 @@ function writeSession(res, session) {
   res.cookie(COOKIE_NAME, signSession(session), { httpOnly: true, sameSite: 'lax', maxAge: DUREE_MS, path: '/' });
 }
 
-module.exports = { readSession, writeSession, readCookie, COOKIE_NAME };
+// ponytail: la session vit seulement dans le cookie, donc un cookie copié avant la déconnexion
+// reste valide jusqu'à son exp. Il faudrait une liste de sessions révoquées en base si ça devient un problème.
+function clearSession(res) {
+  res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: 'lax', path: '/' });
+}
+
+module.exports = { readSession, writeSession, clearSession, readCookie, COOKIE_NAME };
