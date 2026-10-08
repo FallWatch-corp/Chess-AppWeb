@@ -19,6 +19,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     joueur: await obtenirJoueurConnecte(request),
     urlConnexion: `${urlApi}/api/auth/login`,
+    urlDeconnexion: `${urlApi}/api/auth/logout`,
   };
 }
 
@@ -54,7 +55,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App({ loaderData }: Route.ComponentProps) {
-  const { joueur, urlConnexion } = loaderData;
+  const { joueur, urlConnexion, urlDeconnexion } = loaderData;
   // l'API nous renvoie ici avec ?erreur=connexion si la connexion GitHub a raté
   const [parametres] = useSearchParams();
   const connexionRatee = parametres.get("erreur") === "connexion" && !joueur;
@@ -64,9 +65,20 @@ export default function App({ loaderData }: Route.ComponentProps) {
       <header className="flex items-center justify-between border-b px-4 py-3">
         <span className="font-semibold">Chess-AppWeb</span>
         {joueur ? (
-          <span>
-            {joueur.nom} · <span className="font-mono">Elo {joueur.elo}</span>
-          </span>
+          <div className="flex items-center gap-3">
+            <span>
+              {joueur.nom} · <span className="font-mono">Elo {joueur.elo}</span>
+            </span>
+            {/* formulaire HTML classique : c'est l'API qui efface le cookie puis nous renvoie ici */}
+            <form method="post" action={urlDeconnexion}>
+              <button
+                type="submit"
+                className="rounded border px-3 py-1.5 hover:bg-gray-100"
+              >
+                Se déconnecter
+              </button>
+            </form>
+          </div>
         ) : (
           <a
             href={urlConnexion}

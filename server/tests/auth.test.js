@@ -110,6 +110,22 @@ test('un cookie de session modifié à la main est refusé (401)', async () => {
   assert.equal(moi.status, 401);
 });
 
+test('la déconnexion efface la session et ramène à l\'accueil', async () => {
+  simulerGitHub();
+  const connecte = await connexion();
+  const cookieSession = extraireCookie(connecte, COOKIE_NAME);
+
+  const reponse = await request(app).post('/api/auth/logout').set('Cookie', cookieSession);
+
+  assert.equal(reponse.status, 303);
+  assert.equal(reponse.headers.location, 'http://client.test');
+  const cookieEfface = extraireCookie(reponse, COOKIE_NAME);
+  assert.equal(cookieEfface, `${COOKIE_NAME}=`);
+
+  const moi = await request(app).get('/api/moi').set('Cookie', cookieEfface);
+  assert.equal(moi.status, 401);
+});
+
 test('les routes protégées répondent 401 sans session', async () => {
   const moi = await request(app).get('/api/moi');
   const creer = await request(app).post('/api/parties');
