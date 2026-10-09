@@ -1,0 +1,25 @@
+services:
+  server:
+    image: ghcr.io/${COMPTE}/chess-appweb-server:${TAG}
+    ports:
+      - "3000:3000"
+    volumes:
+      - donnees_sqlite:/data
+    environment:
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET}
+      URL_API: ${URL_API}
+      URL_CLIENT: ${URL_CLIENT}
+
+  client:
+    image: ghcr.io/${COMPTE}/chess-appweb-client:${TAG}
+    ports:
+      - "5173:3000"
+    environment:
+      API_URL: http://server:3000
+    depends_on:
+      - server
+
+volumes:
+  donnees_sqlite:
