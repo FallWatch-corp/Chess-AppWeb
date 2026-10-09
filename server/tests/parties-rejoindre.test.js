@@ -10,6 +10,7 @@ const { trouverOuCreerJoueur } = require('../repository/joueurs.js');
 const { trouverPartieParId, demarrerPartie } = require('../repository/parties.js');
 const { creerPartie, rejoindrePartie } = require('../services/parties.js');
 const { appConnectee } = require('./helpers/session.js');
+const db = require('../repository/db.js');
 
 const alice = trouverOuCreerJoueur({ githubId: 1, nom: 'alice' });
 const bob = trouverOuCreerJoueur({ githubId: 2, nom: 'bob' });
@@ -112,4 +113,30 @@ test('GET /api/parties/:id donne sa couleur à chaque joueur', async () => {
   assert.equal(pourBob.body.couleur, body.couleur);
   assert.equal(pourAlice.body.couleur, body.couleur === 'blanc' ? 'noir' : 'blanc');
   assert.equal(pourBob.body.statut, 'en_cours');
+});
+
+test('GET /api/parties/:id donne le nom et l\'Elo des deux joueurs', async () => {
+  const partie = creerPartie(alice.id);
+  rejoindrePartie(bob.id, partie.code, () => true);
+
+  const { body } = await request(appConnectee(app, bob.id)).get(`/api/parties/${partie.id}`);
+
+  assert.deepEqual(body.blanc, { nom: 'alice', elo: 1000 });
+  assert.deepEqual(body.noir, { nom: 'bob', elo: 1000 });
+});
+
+test('GET /api/parties/:id indique qui a le trait d\'après la FEN', async () => {
+  const partie = creerPartie(alice.id);
+  rejoindrePartie(bob.id, partie.code);
+  const avant = await request(appConnectee(app, alice.id)).get(`/api/parties/${partie.id}`);
+
+  // position après 1. e4 : c'est aux noirs de jouer
+  db.prepare('UPDATE parties SET fen = ? WHERE id = ?').run(
+    'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+    partie.id,
+  );
+  const apres = await request(appConnectee(app, alice.id)).get(`/api/parties/${partie.id}`);
+
+  assert.equal(avant.body.trait, 'blanc');
+  assert.equal(apres.body.trait, 'noir');
 });

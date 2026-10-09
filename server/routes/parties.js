@@ -2,6 +2,7 @@ const express = require('express');
 const { exigerConnexion } = require('../middlewares/exiger-connexion.js');
 const { creerPartie, rejoindrePartie } = require('../services/parties.js');
 const { trouverPartieParId } = require('../repository/parties.js');
+const { trouverJoueurParId } = require('../repository/joueurs.js');
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.post('/rejoindre', (req, res) => {
   res.json(resultat);
 });
 
-// Pour l'instant ça sert juste à afficher le code, on va la compléter pour l'échiquier.
+// Sert à afficher le code en attendant l'adversaire, puis l'échiquier (fen).
 router.get('/:id', (req, res) => {
   const partie = trouverPartieParId(Number(req.params.id));
   if (!partie) {
@@ -34,8 +35,25 @@ router.get('/:id', (req, res) => {
   if (partie.blanc === req.joueur.id) couleur = 'blanc';
   if (partie.noir === req.joueur.id) couleur = 'noir';
 
-  const { id, code, statut } = partie;
-  res.json({ id, code, statut, couleur });
+  const { id, code, statut, fen } = partie;
+  res.json({
+    id,
+    code,
+    statut,
+    couleur,
+    fen,
+    // dans une FEN, le 2e champ dit qui doit jouer : w (blancs) ou b (noirs)
+    trait: fen.split(' ')[1] === 'b' ? 'noir' : 'blanc',
+    blanc: joueurPublic(partie.blanc),
+    noir: joueurPublic(partie.noir),
+  });
 });
+
+// null tant que personne n'a cette couleur (partie en attente)
+function joueurPublic(joueurId) {
+  if (joueurId === null) return null;
+  const { nom, elo } = trouverJoueurParId(joueurId);
+  return { nom, elo };
+}
 
 module.exports = router;
