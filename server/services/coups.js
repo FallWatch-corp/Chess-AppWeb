@@ -1,5 +1,6 @@
 const { Chess } = require('chess.js');
 const { trouverPartieParId, enregistrerCoup, enregistrerCoupFinal } = require('../repository/parties.js');
+const { trouverJoueurParId } = require('../repository/joueurs.js');
 const { nouveauxElo } = require('./elo.js');
 const { ErreurApi } = require('./erreur-api.js');
 
