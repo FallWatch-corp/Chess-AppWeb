@@ -101,8 +101,9 @@ function PartieEnCours({ partie }: { partie: Partie }) {
   // Pendant l'envoi, on affiche déjà la position après le coup (affichage optimiste).
   // Dès que le loader a répondu, c'est la FEN du serveur qui s'affiche :
   // si le coup est refusé, la pièce revient donc à sa place.
+  // (fenApres est vide quand le coup nous paraît illégal : on garde alors la position actuelle)
   const fenOptimiste = fetcher.formData?.get("fenApres");
-  const fen = typeof fenOptimiste === "string" ? fenOptimiste : partie.fen;
+  const fen = typeof fenOptimiste === "string" && fenOptimiste !== "" ? fenOptimiste : partie.fen;
   const peutJouer =
     partie.statut === "en_cours" && partie.trait === partie.couleur && fetcher.state === "idle";
 
