@@ -66,7 +66,14 @@ test('GET /api/parties/:id renvoie la partie à son créateur', async () => {
   const reponse = await request(appConnectee(app, alice.id)).get(`/api/parties/${creation.body.id}`);
 
   assert.equal(reponse.status, 200);
-  assert.deepEqual(reponse.body, { ...creation.body, couleur: null });
+  assert.deepEqual(reponse.body, {
+    ...creation.body,
+    couleur: null,
+    fen: DEFAULT_POSITION,
+    trait: 'blanc',
+    blanc: null,
+    noir: null,
+  });
 });
 
 test('GET /api/parties/:id répond 403 à un joueur qui ne participe pas', async () => {
