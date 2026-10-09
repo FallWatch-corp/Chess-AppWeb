@@ -73,6 +73,7 @@ test('GET /api/parties/:id renvoie la partie à son créateur', async () => {
     trait: 'blanc',
     blanc: null,
     noir: null,
+    coups: [],
   });
 });
 

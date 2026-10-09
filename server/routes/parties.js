@@ -1,7 +1,8 @@
 const express = require('express');
 const { exigerConnexion } = require('../middlewares/exiger-connexion.js');
 const { creerPartie, rejoindrePartie } = require('../services/parties.js');
-const { trouverPartieParId } = require('../repository/parties.js');
+const { jouerCoup } = require('../services/coups.js');
+const { trouverPartieParId, listerCoups } = require('../repository/parties.js');
 const { trouverJoueurParId } = require('../repository/joueurs.js');
 
 const router = express.Router();
@@ -19,7 +20,15 @@ router.post('/rejoindre', (req, res) => {
 });
 
 // Sert à afficher le code en attendant l'adversaire, puis l'échiquier (fen).
-router.get('/:id', (req, res) => {
+router.get('/:id', envoyerPartie);
+
+// Le coup est validé par chess.js dans le service ; on renvoie la partie à jour.
+router.post('/:id/coups', (req, res) => {
+  jouerCoup(Number(req.params.id), req.joueur.id, req.body ?? {});
+  envoyerPartie(req, res);
+});
+
+function envoyerPartie(req, res) {
   const partie = trouverPartieParId(Number(req.params.id));
   if (!partie) {
     return res.status(404).json({ erreur: 'Partie introuvable.' });
@@ -46,8 +55,9 @@ router.get('/:id', (req, res) => {
     trait: fen.split(' ')[1] === 'b' ? 'noir' : 'blanc',
     blanc: joueurPublic(partie.blanc),
     noir: joueurPublic(partie.noir),
+    coups: listerCoups(id),
   });
-});
+}
 
 // null tant que personne n'a cette couleur (partie en attente)
 function joueurPublic(joueurId) {
