@@ -1,4 +1,5 @@
 const db = require('./db.js');
+const { mettreAJourElo } = require('./joueurs.js');
 
 const insertPartie = db.prepare(`
   INSERT INTO parties (code, createur, fen) VALUES (?, ?, ?)
@@ -26,6 +27,14 @@ const updateDemarrer = db.prepare(`
 // sur la meme position, seulement le premier modifie la ligne.
 const updateFen = db.prepare(`
   UPDATE parties SET fen = ?
+  WHERE id = ? AND fen = ? AND statut = 'en_cours'
+`);
+
+const updateFenTerminee = db.prepare(`
+  UPDATE parties
+  SET fen = ?, statut = 'terminee', resultat = ?,
+      elo_blanc_avant = ?, elo_blanc_apres = ?,
+      elo_noir_avant = ?, elo_noir_apres = ?
   WHERE id = ? AND fen = ? AND statut = 'en_cours'
 `);
 
@@ -73,6 +82,36 @@ function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup }) {
   }
 }
 
+// Fin de partie : le dernier coup, la position, le statut, le résultat
+// et les deux nouveaux Elo sont enregistrés ensemble ou pas du tout.
+// resultat : 'blanc', 'noir' ou 'nulle'.
+// Retourne false si la partie n'était plus en cours (rien n'est enregistré).
+function enregistrerCoupFinal({
+  id, ancienneFen, nouvelleFen, coup, resultat,
+  blancId, noirId, eloBlancAvant, eloBlancApres, eloNoirAvant, eloNoirApres,
+}) {
+  db.exec('BEGIN');
+  try {
+    const modifie = updateFenTerminee.run(
+      nouvelleFen, resultat,
+      eloBlancAvant, eloBlancApres, eloNoirAvant, eloNoirApres,
+      id, ancienneFen,
+    ).changes;
+    if (modifie !== 1) {
+      db.exec('ROLLBACK');
+      return false;
+    }
+    insertCoup.run(id, id, coup);
+    mettreAJourElo(blancId, eloBlancApres);
+    mettreAJourElo(noirId, eloNoirApres);
+    db.exec('COMMIT');
+    return true;
+  } catch (erreur) {
+    db.exec('ROLLBACK');
+    throw erreur;
+  }
+}
+
 function listerCoups(partieId) {
   return selectCoups.all(partieId).map((ligne) => ligne.coup);
 }
@@ -83,5 +122,6 @@ module.exports = {
   trouverPartieParCode,
   demarrerPartie,
   enregistrerCoup,
+  enregistrerCoupFinal,
   listerCoups,
 };

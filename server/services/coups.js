@@ -1,5 +1,6 @@
 const { Chess } = require('chess.js');
-const { trouverPartieParId, enregistrerCoup } = require('../repository/parties.js');
+const { trouverPartieParId, enregistrerCoup, enregistrerCoupFinal } = require('../repository/parties.js');
+const { nouveauxElo } = require('./elo.js');
 const { ErreurApi } = require('./erreur-api.js');
 
 const CASE = /^[a-h][1-8]$/;
@@ -40,12 +41,43 @@ function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}) {
     throw new ErreurApi(422, 'Coup illégal.');
   }
 
-  const enregistre = enregistrerCoup({
+    const infosCoup = {
     id: partie.id,
     ancienneFen: partie.fen,
     nouvelleFen: echecs.fen(),
     coup: coup.san,
-  });
+  };
+
+  // Après le coup, chess.js dit si la partie est finie.
+  // Le joueur qui vient de jouer (monCamp) gagne s'il y a mat.
+  let resultat = null;
+  if (echecs.isCheckmate()) {
+    resultat = monCamp === 'w' ? 'blanc' : 'noir';
+  } else if (echecs.isStalemate()) {
+    resultat = 'nulle';
+  }
+
+  let enregistre;
+  if (resultat === null) {
+    enregistre = enregistrerCoup(infosCoup);
+  } else {
+    const blanc = trouverJoueurParId(partie.blanc);
+    const noir = trouverJoueurParId(partie.noir);
+    const scoreBlanc = resultat === 'blanc' ? 1 : resultat === 'noir' ? 0 : 0.5;
+    const { eloA, eloB } = nouveauxElo(blanc.elo, noir.elo, scoreBlanc);
+
+    enregistre = enregistrerCoupFinal({
+      ...infosCoup,
+      resultat,
+      blancId: partie.blanc,
+      noirId: partie.noir,
+      eloBlancAvant: blanc.elo,
+      eloBlancApres: eloA,
+      eloNoirAvant: noir.elo,
+      eloNoirApres: eloB,
+    });
+  }
+
   if (!enregistre) {
     throw new ErreurApi(409, 'La position a changé, rechargez la partie.');
   }
