@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { redirect } from "react-router";
+import { redirect, useFetcher } from "react-router";
+import { Chess } from "chess.js";
 import type { Route } from "./+types/partie";
 import { appelerApi } from "../api.server";
 import { useInterrogation } from "../hooks/useInterrogation";
@@ -19,6 +20,7 @@ type Partie = {
   trait: Couleur;
   blanc: JoueurPartie | null;
   noir: JoueurPartie | null;
+  coups: string[];
 };
 
 export function meta({}: Route.MetaArgs) {
@@ -37,11 +39,37 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   return { partie };
 }
 
+// Envoie le coup à l'API. Après l'action, React Router relance le loader :
+// la page reçoit la FEN validée par le serveur (ou l'ancienne si le coup est refusé).
+export async function action({ request, params }: Route.ActionArgs) {
+  const formulaire = await request.formData();
+  const coup = {
+    de: formulaire.get("de"),
+    vers: formulaire.get("vers"),
+    promotion: formulaire.get("promotion") || undefined,
+  };
+
+  const reponse = await appelerApi(request, `/api/parties/${params.id}/coups`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(coup),
+  });
+  if (reponse.status === 401) throw redirect("/");
+  if (!reponse.ok) {
+    // 409 hors tour / partie terminée, 422 coup illégal, 403… : l'API donne le message
+    const { erreur } = await reponse.json();
+    return { erreur: erreur as string };
+  }
+  return { erreur: null };
+}
+
 export default function PagePartie({ loaderData }: Route.ComponentProps) {
   const { partie } = loaderData;
 
-  // tant qu'on attend l'adversaire on redemande l'état de la partie toutes les 2 s
-  useInterrogation(partie.statut === "en_attente");
+  // On redemande l'état de la partie à l'API toutes les 2 s : en attente pour voir
+  // l'adversaire arriver, puis pendant la partie pour voir ses coups.
+  // Ça s'arrête quand la partie est terminée, ou quand on quitte la page (nettoyage du hook).
+  useInterrogation(partie.statut !== "terminee");
 
   if (partie.statut !== "en_attente") {
     return <PartieEnCours partie={partie} />;
@@ -64,6 +92,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
 
 function PartieEnCours({ partie }: { partie: Partie }) {
   const [theme, setTheme] = useThemeEchiquier();
+  const fetcher = useFetcher<typeof action>();
   // comme sur l'échiquier : l'adversaire en haut, moi en bas
   const moi = partie.couleur ?? "blanc";
   const adversaire = moi === "blanc" ? "noir" : "blanc";
@@ -71,12 +100,50 @@ function PartieEnCours({ partie }: { partie: Partie }) {
   const messageTrait =
     partie.trait === partie.couleur ? "À vous de jouer" : `Trait aux ${camp}`;
 
+  // Pendant l'envoi, on affiche déjà la position après le coup (affichage optimiste).
+  // Dès que le loader a répondu, c'est la FEN du serveur qui s'affiche :
+  // si le coup est refusé, la pièce revient donc à sa place.
+  // (fenApres est vide quand le coup nous paraît illégal : on garde alors la position actuelle)
+  const fenOptimiste = fetcher.formData?.get("fenApres");
+  const fen = typeof fenOptimiste === "string" && fenOptimiste !== "" ? fenOptimiste : partie.fen;
+  const peutJouer =
+    partie.statut === "en_cours" && partie.trait === partie.couleur && fetcher.state === "idle";
+
+  function jouer(coup: { de: string; vers: string; promotion?: "q" }) {
+    // chess.js sert seulement à calculer la position à afficher en attendant ;
+    // c'est le serveur qui décide si le coup est légal (même s'il nous paraît illégal ici)
+    let fenApres = "";
+    try {
+      fenApres = new Chess(partie.fen).move({ from: coup.de, to: coup.vers, promotion: coup.promotion }).after;
+    } catch {
+      // coup illégal : on l'envoie quand même, le serveur répondra 422
+    }
+    // pas besoin d'attendre : la page se met à jour quand le loader a rechargé la partie
+    void fetcher.submit(
+      { de: coup.de, vers: coup.vers, promotion: coup.promotion ?? "", fenApres },
+      { method: "post" },
+    );
+    return fenApres !== "";
+  }
+
+  const erreur = fetcher.state === "idle" ? fetcher.data?.erreur : null;
+
   return (
     <main className="container mx-auto flex flex-col items-center gap-4 p-8">
       <p className="text-lg font-medium">{messageTrait}</p>
       <BandeauJoueur joueur={partie[adversaire]} couleur={adversaire} trait={partie.trait} />
-      <Echiquier fen={partie.fen} couleur={partie.couleur} theme={theme} />
+      <Echiquier
+        fen={fen}
+        couleur={partie.couleur}
+        theme={theme}
+        onCoup={peutJouer ? jouer : undefined}
+      />
       <BandeauJoueur joueur={partie[moi]} couleur={moi} trait={partie.trait} />
+      {erreur && (
+        <p role="alert" className="text-red-600">
+          {erreur}
+        </p>
+      )}
       <SelecteurTheme theme={theme} onChange={setTheme} />
     </main>
   );
