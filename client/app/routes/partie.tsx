@@ -66,8 +66,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function PagePartie({ loaderData }: Route.ComponentProps) {
   const { partie } = loaderData;
 
-  // tant qu'on attend l'adversaire on redemande l'état de la partie toutes les 2 s
-  useInterrogation(partie.statut === "en_attente");
+  // On redemande l'état de la partie à l'API toutes les 2 s : en attente pour voir
+  // l'adversaire arriver, puis pendant la partie pour voir ses coups.
+  // Ça s'arrête quand la partie est terminée, ou quand on quitte la page (nettoyage du hook).
+  useInterrogation(partie.statut !== "terminee");
 
   if (partie.statut !== "en_attente") {
     return <PartieEnCours partie={partie} />;
