@@ -32,7 +32,7 @@ function jouer(joueur, partieId, de, vers) {
 
 function partieEnBase(partieId) {
   return db.prepare(
-    'SELECT statut, resultat, elo_blanc_avant, elo_blanc_apres, elo_noir_avant, elo_noir_apres FROM parties WHERE id = ?',
+    'SELECT statut, resultat, cause, elo_blanc_avant, elo_blanc_apres, elo_noir_avant, elo_noir_apres FROM parties WHERE id = ?',
   ).get(partieId);
 }
 
@@ -58,6 +58,7 @@ test('un mat termine la partie : le joueur qui mate gagne et les Elo sont mis à
   const etat = partieEnBase(partie.id);
   assert.equal(etat.statut, 'terminee');
   assert.equal(etat.resultat, 'noir');
+  assert.equal(etat.cause, 'mat');
   assert.equal(etat.elo_blanc_avant, 1000);
   assert.equal(etat.elo_noir_avant, 1000);
   assert.equal(etat.elo_blanc_apres, 990);
@@ -79,6 +80,7 @@ test('un pat termine la partie par une nulle et met à jour les Elo', async () =
   const etat = partieEnBase(partie.id);
   assert.equal(etat.statut, 'terminee');
   assert.equal(etat.resultat, 'nulle');
+  assert.equal(etat.cause, 'pat');
   assert.equal(etat.elo_blanc_apres, attendu.eloA);
   assert.equal(etat.elo_noir_apres, attendu.eloB);
   assert.equal(trouverJoueurParId(partie.blanc.id).elo, attendu.eloA);

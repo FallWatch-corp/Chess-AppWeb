@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS parties (
   statut            TEXT NOT NULL DEFAULT 'en_attente'
                     CHECK (statut IN ('en_attente', 'en_cours', 'terminee')),
   resultat          TEXT,
+  cause             TEXT,
   elo_blanc_avant   INTEGER,
   elo_blanc_apres   INTEGER,
   elo_noir_avant    INTEGER,

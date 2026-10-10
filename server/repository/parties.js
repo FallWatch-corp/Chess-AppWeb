@@ -30,12 +30,14 @@ const updateFen = db.prepare(`
   WHERE id = ? AND fen = ? AND statut = 'en_cours'
 `);
 
-const updateFenTerminee = db.prepare(`
+// Pour un abandon, les deux FEN valent null : la position ne change pas
+// et on ne vérifie pas qu'elle est restée la même (l'abandon vaut quelle que soit la position).
+const updateTerminer = db.prepare(`
   UPDATE parties
-  SET fen = ?, statut = 'terminee', resultat = ?,
+  SET fen = COALESCE(?, fen), statut = 'terminee', resultat = ?, cause = ?,
       elo_blanc_avant = ?, elo_blanc_apres = ?,
       elo_noir_avant = ?, elo_noir_apres = ?
-  WHERE id = ? AND fen = ? AND statut = 'en_cours'
+  WHERE id = ? AND fen = COALESCE(?, fen) AND statut = 'en_cours'
 `);
 
 // ordre = nombre de coups déjà joués + 1
@@ -82,18 +84,19 @@ function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup }) {
   }
 }
 
-// Fin de partie : le dernier coup, la position, le statut, le résultat
-// et les deux nouveaux Elo sont enregistrés ensemble ou pas du tout.
-// resultat : 'blanc', 'noir' ou 'nulle'.
+// Fin de partie : le dernier coup (s'il y en a un), la position, le statut, le résultat,
+// la cause et les deux nouveaux Elo sont enregistrés ensemble ou pas du tout.
+// resultat : 'blanc', 'noir' ou 'nulle'. cause : 'mat', 'pat' ou 'abandon'.
+// Sans coup (abandon), ancienneFen, nouvelleFen et coup sont absents.
 // Retourne false si la partie n'était plus en cours (rien n'est enregistré).
-function enregistrerCoupFinal({
-  id, ancienneFen, nouvelleFen, coup, resultat,
+function enregistrerFinDePartie({
+  id, ancienneFen = null, nouvelleFen = null, coup, resultat, cause,
   blancId, noirId, eloBlancAvant, eloBlancApres, eloNoirAvant, eloNoirApres,
 }) {
   db.exec('BEGIN');
   try {
-    const modifie = updateFenTerminee.run(
-      nouvelleFen, resultat,
+    const modifie = updateTerminer.run(
+      nouvelleFen, resultat, cause,
       eloBlancAvant, eloBlancApres, eloNoirAvant, eloNoirApres,
       id, ancienneFen,
     ).changes;
@@ -101,7 +104,7 @@ function enregistrerCoupFinal({
       db.exec('ROLLBACK');
       return false;
     }
-    insertCoup.run(id, id, coup);
+    if (coup) insertCoup.run(id, id, coup);
     mettreAJourElo(blancId, eloBlancApres);
     mettreAJourElo(noirId, eloNoirApres);
     db.exec('COMMIT');
@@ -122,6 +125,6 @@ module.exports = {
   trouverPartieParCode,
   demarrerPartie,
   enregistrerCoup,
-  enregistrerCoupFinal,
+  enregistrerFinDePartie,
   listerCoups,
 };

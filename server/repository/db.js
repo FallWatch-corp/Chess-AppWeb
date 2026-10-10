@@ -9,4 +9,11 @@ const db = new DatabaseSync(cheminBase);
 db.exec('PRAGMA foreign_keys = ON;');
 db.exec(readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
 
+// CREATE TABLE IF NOT EXISTS ne touche pas une table qui existe déjà :
+// les colonnes ajoutées après coup doivent être ajoutées à la main aux anciennes bases.
+const colonnesParties = db.prepare('PRAGMA table_info(parties)').all().map((c) => c.name);
+if (!colonnesParties.includes('cause')) {
+  db.exec('ALTER TABLE parties ADD COLUMN cause TEXT');
+}
+
 module.exports = db;

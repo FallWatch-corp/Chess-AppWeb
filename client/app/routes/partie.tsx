@@ -49,11 +49,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     promotion: formulaire.get("promotion") || undefined,
   };
 
-  const reponse = await appelerApi(request, `/api/parties/${params.id}/coups`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(coup),
-  });
+  const reponse =
+    formulaire.get("intent") === "abandon"
+      ? await appelerApi(request, `/api/parties/${params.id}/abandon`, { method: "POST" })
+      : await appelerApi(request, `/api/parties/${params.id}/coups`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(coup),
+        });
   if (reponse.status === 401) throw redirect("/");
   if (!reponse.ok) {
     // 409 hors tour / partie terminée, 422 coup illégal, 403… : l'API donne le message
@@ -97,8 +100,9 @@ function PartieEnCours({ partie }: { partie: Partie }) {
   const moi = partie.couleur ?? "blanc";
   const adversaire = moi === "blanc" ? "noir" : "blanc";
   const camp = partie.trait === "blanc" ? "blancs" : "noirs";
-  const messageTrait =
-    partie.trait === partie.couleur ? "À vous de jouer" : `Trait aux ${camp}`;
+  const enCours = partie.statut === "en_cours";
+  let messageTrait = partie.trait === partie.couleur ? "À vous de jouer" : `Trait aux ${camp}`;
+  if (!enCours) messageTrait = "Partie terminée";
 
   // Pendant l'envoi, on affiche déjà la position après le coup (affichage optimiste).
   // Dès que le loader a répondu, c'est la FEN du serveur qui s'affiche :
@@ -106,8 +110,12 @@ function PartieEnCours({ partie }: { partie: Partie }) {
   // (fenApres est vide quand le coup nous paraît illégal : on garde alors la position actuelle)
   const fenOptimiste = fetcher.formData?.get("fenApres");
   const fen = typeof fenOptimiste === "string" && fenOptimiste !== "" ? fenOptimiste : partie.fen;
-  const peutJouer =
-    partie.statut === "en_cours" && partie.trait === partie.couleur && fetcher.state === "idle";
+  const peutJouer = enCours && partie.trait === partie.couleur && fetcher.state === "idle";
+
+  function abandonner() {
+    if (!window.confirm("Abandonner la partie ? Elle sera comptée comme perdue.")) return;
+    void fetcher.submit({ intent: "abandon" }, { method: "post" });
+  }
 
   function jouer(coup: { de: string; vers: string; promotion?: "q" }) {
     // chess.js sert seulement à calculer la position à afficher en attendant ;
@@ -139,6 +147,16 @@ function PartieEnCours({ partie }: { partie: Partie }) {
         onCoup={peutJouer ? jouer : undefined}
       />
       <BandeauJoueur joueur={partie[moi]} couleur={moi} trait={partie.trait} />
+      {enCours && partie.couleur && (
+        <button
+          type="button"
+          onClick={abandonner}
+          disabled={fetcher.state !== "idle"}
+          className="rounded border border-red-300 px-3 py-1.5 text-red-700 hover:bg-red-50 disabled:opacity-50"
+        >
+          Abandonner
+        </button>
+      )}
       {erreur && (
         <p role="alert" className="text-red-600">
           {erreur}
