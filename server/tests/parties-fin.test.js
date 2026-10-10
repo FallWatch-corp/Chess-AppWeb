@@ -115,3 +115,33 @@ test('la fin de partie est une seule transaction : si l\'ajout du coup échoue, 
   assert.equal(trouverJoueurParId(partie.blanc.id).elo, 1000);
   assert.equal(trouverJoueurParId(partie.noir.id).elo, 1000);
 });
+
+test('GET /api/parties/:id donne le résultat, la cause et les Elo avant → après aux deux joueurs', async () => {
+  const partie = nouvellePartie();
+
+  const enCours = await request(appConnectee(app, partie.blanc.id)).get(`/api/parties/${partie.id}`);
+  assert.equal(enCours.body.fin, null);
+
+  await jouerMatDuFou(partie);
+
+  const attendu = {
+    resultat: 'noir',
+    cause: 'mat',
+    eloBlanc: { avant: 1000, apres: 990 },
+    eloNoir: { avant: 1000, apres: 1010 },
+  };
+  for (const joueur of [partie.blanc, partie.noir]) {
+    const reponse = await request(appConnectee(app, joueur.id)).get(`/api/parties/${partie.id}`);
+    assert.deepEqual(reponse.body.fin, attendu);
+  }
+});
+
+test('le résultat garde les Elo de la partie même si le classement du joueur change ensuite', async () => {
+  const partie = nouvellePartie();
+  await jouerMatDuFou(partie);
+  mettreAJourElo(partie.noir.id, 1500);
+
+  const reponse = await request(appConnectee(app, partie.noir.id)).get(`/api/parties/${partie.id}`);
+
+  assert.deepEqual(reponse.body.fin.eloNoir, { avant: 1000, apres: 1010 });
+});

@@ -7,7 +7,8 @@ const insertPartie = db.prepare(`
 `);
 
 const selectParId = db.prepare(`
-  SELECT id, code, createur, blanc, noir, fen, statut
+  SELECT id, code, createur, blanc, noir, fen, statut, resultat, cause,
+         elo_blanc_avant, elo_blanc_apres, elo_noir_avant, elo_noir_apres
   FROM parties WHERE id = ?
 `);
 

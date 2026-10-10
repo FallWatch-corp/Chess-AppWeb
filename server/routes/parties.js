@@ -63,7 +63,20 @@ function envoyerPartie(req, res) {
     blanc: joueurPublic(partie.blanc),
     noir: joueurPublic(partie.noir),
     coups: listerCoups(id),
+    fin: finPublique(partie),
   });
+}
+
+// null tant que la partie n'est pas terminée.
+// Les Elo viennent de la partie et pas du joueur : son Elo actuel a pu changer depuis.
+function finPublique(partie) {
+  if (partie.statut !== 'terminee') return null;
+  return {
+    resultat: partie.resultat,
+    cause: partie.cause,
+    eloBlanc: { avant: partie.elo_blanc_avant, apres: partie.elo_blanc_apres },
+    eloNoir: { avant: partie.elo_noir_avant, apres: partie.elo_noir_apres },
+  };
 }
 
 // null tant que personne n'a cette couleur (partie en attente)
