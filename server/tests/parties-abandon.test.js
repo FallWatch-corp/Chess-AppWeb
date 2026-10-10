@@ -103,3 +103,13 @@ test('abandonner sans session répond 401', async () => {
 
   assert.equal(reponse.status, 401);
 });
+
+test('après un abandon, la partie indique la cause « abandon » et le gagnant', async () => {
+  const { id, blanc, noir } = nouvellePartie();
+  await abandonner(blanc, id);
+
+  const reponse = await request(appConnectee(app, noir.id)).get(`/api/parties/${id}`);
+
+  assert.equal(reponse.body.fin.resultat, 'noir');
+  assert.equal(reponse.body.fin.cause, 'abandon');
+});

@@ -21,6 +21,21 @@ type Partie = {
   blanc: JoueurPartie | null;
   noir: JoueurPartie | null;
   coups: string[];
+  fin: Fin | null;
+};
+
+type EloPartie = { avant: number; apres: number };
+type Fin = {
+  resultat: Couleur | "nulle";
+  cause: string;
+  eloBlanc: EloPartie;
+  eloNoir: EloPartie;
+};
+
+const CAUSES: Record<string, string> = {
+  mat: "par échec et mat",
+  pat: "par pat",
+  abandon: "par abandon",
 };
 
 export function meta({}: Route.MetaArgs) {
@@ -101,8 +116,9 @@ function PartieEnCours({ partie }: { partie: Partie }) {
   const adversaire = moi === "blanc" ? "noir" : "blanc";
   const camp = partie.trait === "blanc" ? "blancs" : "noirs";
   const enCours = partie.statut === "en_cours";
-  let messageTrait = partie.trait === partie.couleur ? "À vous de jouer" : `Trait aux ${camp}`;
-  if (!enCours) messageTrait = "Partie terminée";
+  const messageTrait = partie.trait === partie.couleur ? "À vous de jouer" : `Trait aux ${camp}`;
+  // une fois la partie terminée, plus personne n'est au trait
+  const trait = enCours ? partie.trait : null;
 
   // Pendant l'envoi, on affiche déjà la position après le coup (affichage optimiste).
   // Dès que le loader a répondu, c'est la FEN du serveur qui s'affiche :
@@ -138,15 +154,19 @@ function PartieEnCours({ partie }: { partie: Partie }) {
 
   return (
     <main className="container mx-auto flex flex-col items-center gap-4 p-8">
-      <p className="text-lg font-medium">{messageTrait}</p>
-      <BandeauJoueur joueur={partie[adversaire]} couleur={adversaire} trait={partie.trait} />
+      {partie.fin ? (
+        <ResultatPartie partie={partie} fin={partie.fin} />
+      ) : (
+        <p className="text-lg font-medium">{messageTrait}</p>
+      )}
+      <BandeauJoueur joueur={partie[adversaire]} couleur={adversaire} trait={trait} />
       <Echiquier
         fen={fen}
         couleur={partie.couleur}
         theme={theme}
         onCoup={peutJouer ? jouer : undefined}
       />
-      <BandeauJoueur joueur={partie[moi]} couleur={moi} trait={partie.trait} />
+      <BandeauJoueur joueur={partie[moi]} couleur={moi} trait={trait} />
       {enCours && partie.couleur && (
         <button
           type="button"
@@ -167,6 +187,43 @@ function PartieEnCours({ partie }: { partie: Partie }) {
   );
 }
 
+// Le résultat est donné du point de vue du joueur qui regarde la page.
+function ResultatPartie({ partie, fin }: { partie: Partie; fin: Fin }) {
+  let titre = "Nulle";
+  if (fin.resultat !== "nulle") {
+    titre = fin.resultat === partie.couleur ? "Victoire" : "Défaite";
+  }
+  const lignes = [
+    { couleur: "Blancs", joueur: partie.blanc, elo: fin.eloBlanc },
+    { couleur: "Noirs", joueur: partie.noir, elo: fin.eloNoir },
+  ];
+
+  return (
+    <section
+      role="status"
+      className="flex w-full max-w-140 flex-col items-center gap-2 rounded border p-4"
+    >
+      <h1 className="text-xl font-semibold">
+        {titre} {CAUSES[fin.cause] ?? ""}
+      </h1>
+      <ul className="font-mono">
+        {lignes.map(({ couleur, joueur, elo }) => (
+          <li key={couleur}>
+            <span className="font-sans">
+              {couleur} · {joueur?.nom ?? "?"} :
+            </span>{" "}
+            {elo.avant} → {elo.apres} ({formaterVariation(elo.apres - elo.avant)})
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function formaterVariation(variation: number) {
+  return variation > 0 ? `+${variation}` : String(variation);
+}
+
 function BandeauJoueur({
   joueur,
   couleur,
@@ -174,7 +231,7 @@ function BandeauJoueur({
 }: {
   joueur: JoueurPartie | null;
   couleur: Couleur;
-  trait: Couleur;
+  trait: Couleur | null;
 }) {
   return (
     <div className="flex w-full max-w-140 items-center justify-between">
