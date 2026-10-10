@@ -36,6 +36,9 @@ const CAUSES: Record<string, string> = {
   mat: "par échec et mat",
   pat: "par pat",
   abandon: "par abandon",
+  repetition: "par répétition",
+  materiel_insuffisant: "par matériel insuffisant",
+  cinquante_coups: "par la règle des 50 coups",
 };
 
 export function meta({}: Route.MetaArgs) {

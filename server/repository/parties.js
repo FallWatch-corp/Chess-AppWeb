@@ -87,7 +87,8 @@ function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup }) {
 
 // Fin de partie : le dernier coup (s'il y en a un), la position, le statut, le résultat,
 // la cause et les deux nouveaux Elo sont enregistrés ensemble ou pas du tout.
-// resultat : 'blanc', 'noir' ou 'nulle'. cause : 'mat', 'pat' ou 'abandon'.
+// resultat : 'blanc', 'noir' ou 'nulle'.
+// cause : 'mat', 'abandon', ou pour une nulle 'pat', 'materiel_insuffisant', 'repetition', 'cinquante_coups'.
 // Sans coup (abandon), ancienneFen, nouvelleFen et coup sont absents.
 // Retourne false si la partie n'était plus en cours (rien n'est enregistré).
 function enregistrerFinDePartie({
