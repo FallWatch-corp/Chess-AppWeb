@@ -9,6 +9,7 @@ const upsertParGithubId = db.prepare(`
 `);
 
 const selectParId = db.prepare('SELECT id, nom, elo FROM joueurs WHERE id = ?');
+const updateElo = db.prepare('UPDATE joueurs SET elo = ? WHERE id = ?');
 
 function trouverOuCreerJoueur({ githubId, nom }) {
   return upsertParGithubId.get(githubId, nom);
@@ -18,4 +19,8 @@ function trouverJoueurParId(id) {
   return selectParId.get(id);
 }
 
-module.exports = { trouverOuCreerJoueur, trouverJoueurParId };
+function mettreAJourElo(id, elo) {
+  updateElo.run(elo, id);
+}
+
+module.exports = { trouverOuCreerJoueur, trouverJoueurParId, mettreAJourElo };

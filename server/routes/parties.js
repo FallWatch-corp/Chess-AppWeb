@@ -2,6 +2,7 @@ const express = require('express');
 const { exigerConnexion } = require('../middlewares/exiger-connexion.js');
 const { creerPartie, rejoindrePartie } = require('../services/parties.js');
 const { jouerCoup } = require('../services/coups.js');
+const { abandonner } = require('../services/fin-partie.js');
 const { trouverPartieParId, listerCoups } = require('../repository/parties.js');
 const { trouverJoueurParId } = require('../repository/joueurs.js');
 
@@ -25,6 +26,12 @@ router.get('/:id', envoyerPartie);
 // Le coup est validé par chess.js dans le service ; on renvoie la partie à jour.
 router.post('/:id/coups', (req, res) => {
   jouerCoup(Number(req.params.id), req.joueur.id, req.body ?? {});
+  envoyerPartie(req, res);
+});
+
+// L'adversaire voit l'abandon au prochain GET (interrogation toutes les 2 s).
+router.post('/:id/abandon', (req, res) => {
+  abandonner(Number(req.params.id), req.joueur.id);
   envoyerPartie(req, res);
 });
 
