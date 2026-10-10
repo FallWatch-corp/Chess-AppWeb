@@ -3,6 +3,7 @@ import { redirect, useFetcher } from "react-router";
 import { Chess } from "chess.js";
 import type { Route } from "./+types/partie";
 import { appelerApi } from "../api.server";
+import { CAUSES, formaterVariation } from "../fin-partie";
 import { useInterrogation } from "../hooks/useInterrogation";
 import { useThemeEchiquier } from "../hooks/useThemeEchiquier";
 import { Echiquier } from "../echiquier/Echiquier";
@@ -30,12 +31,6 @@ type Fin = {
   cause: string;
   eloBlanc: EloPartie;
   eloNoir: EloPartie;
-};
-
-const CAUSES: Record<string, string> = {
-  mat: "par échec et mat",
-  pat: "par pat",
-  abandon: "par abandon",
 };
 
 export function meta({}: Route.MetaArgs) {
@@ -218,10 +213,6 @@ function ResultatPartie({ partie, fin }: { partie: Partie; fin: Fin }) {
       </ul>
     </section>
   );
-}
-
-function formaterVariation(variation: number) {
-  return variation > 0 ? `+${variation}` : String(variation);
 }
 
 function BandeauJoueur({

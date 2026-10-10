@@ -145,3 +145,68 @@ test('le résultat garde les Elo de la partie même si le classement du joueur c
 
   assert.deepEqual(reponse.body.fin.eloNoir, { avant: 1000, apres: 1010 });
 });
+
+
+function partieEstNulle(partieId, cause) {
+  const etat = partieEnBase(partieId);
+  assert.equal(etat.statut, 'terminee');
+  assert.equal(etat.resultat, 'nulle');
+  assert.equal(etat.cause, cause);
+}
+
+test('la même position trois fois termine la partie par une nulle (répétition)', async () => {
+  const { id, blanc, noir } = nouvellePartie();
+  mettreAJourElo(blanc.id, 1200);
+  await jouer(blanc, id, 'e2', 'e4');
+  await jouer(noir, id, 'e7', 'e5');
+  // les cavaliers sortent et rentrent deux fois : la position après 1. e4 e5 revient trois fois
+  let reponse;
+  for (let tour = 1; tour <= 2; tour++) {
+    await jouer(blanc, id, 'g1', 'f3');
+    await jouer(noir, id, 'b8', 'c6');
+    reponse = await jouer(blanc, id, 'f3', 'g1');
+    assert.equal(reponse.body.statut, 'en_cours');
+    reponse = await jouer(noir, id, 'c6', 'b8');
+  }
+
+  assert.equal(reponse.status, 200);
+  partieEstNulle(id, 'repetition');
+  const attendu = nouveauxElo(1200, 1000, 0.5);
+  assert.equal(trouverJoueurParId(blanc.id).elo, attendu.eloA);
+  assert.equal(trouverJoueurParId(noir.id).elo, attendu.eloB);
+});
+
+test('roi contre roi termine la partie par une nulle (matériel insuffisant)', async () => {
+  const partie = nouvellePartie();
+  // le roi blanc prend le dernier pion : il ne reste que les deux rois
+  mettreFen(partie.id, 'k7/8/8/8/8/8/1p6/K7 w - - 0 1');
+
+  const reponse = await jouer(partie.blanc, partie.id, 'a1', 'b2');
+
+  assert.equal(reponse.status, 200);
+  partieEstNulle(partie.id, 'materiel_insuffisant');
+  assert.equal(reponse.body.fin.cause, 'materiel_insuffisant');
+});
+
+test('50 coups sans prise ni coup de pion terminent la partie par une nulle', async () => {
+  const partie = nouvellePartie();
+  // le 5e champ de la FEN compte les demi-coups sans prise ni pion : 99, donc le prochain fait 100
+  mettreFen(partie.id, 'k7/8/8/8/8/8/8/KR6 w - - 99 80');
+
+  const reponse = await jouer(partie.blanc, partie.id, 'b1', 'b2');
+
+  assert.equal(reponse.status, 200);
+  partieEstNulle(partie.id, 'cinquante_coups');
+});
+
+test('un mat au 50e coup reste un mat', async () => {
+  const partie = nouvellePartie();
+  // Tb8# : le roi noir en h8 est enfermé par le roi blanc en g6
+  mettreFen(partie.id, '7k/8/6K1/8/8/8/8/1R6 w - - 99 80');
+
+  await jouer(partie.blanc, partie.id, 'b1', 'b8');
+
+  const etat = partieEnBase(partie.id);
+  assert.equal(etat.resultat, 'blanc');
+  assert.equal(etat.cause, 'mat');
+});

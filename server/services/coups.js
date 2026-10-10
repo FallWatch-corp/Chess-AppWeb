@@ -1,10 +1,33 @@
 const { Chess } = require('chess.js');
-const { trouverPartieParId, enregistrerCoup } = require('../repository/parties.js');
+const { trouverPartieParId, enregistrerCoup, listerCoups } = require('../repository/parties.js');
 const { terminerPartie } = require('./fin-partie.js');
 const { ErreurApi } = require('./erreur-api.js');
 
 const CASE = /^[a-h][1-8]$/;
 const PROMOTIONS = ['q', 'r', 'b', 'n'];
+
+// La FEN ne dit pas combien de fois une position est déjà arrivée : pour détecter
+// la répétition, chess.js a besoin de l'historique, donc on rejoue les coups en base.
+// La FEN en base reste la référence : si les coups ne mènent pas à cette position,
+// on repart de la FEN seule (la répétition ne sera alors pas détectée).
+function chargerPosition(partie) {
+  const echecs = new Chess();
+  try {
+    for (const coup of listerCoups(partie.id)) echecs.move(coup);
+  } catch {
+    // coup illisible : la comparaison juste en dessous nous ramène à la FEN
+  }
+  return echecs.fen() === partie.fen ? echecs : new Chess(partie.fen);
+}
+
+// Les causes de nulle, dans l'ordre où on les teste.
+function causeDeNulle(echecs) {
+  if (echecs.isStalemate()) return 'pat';
+  if (echecs.isInsufficientMaterial()) return 'materiel_insuffisant';
+  if (echecs.isThreefoldRepetition()) return 'repetition';
+  if (echecs.isDrawByFiftyMoves()) return 'cinquante_coups';
+  return null;
+}
 
 // Le serveur est l'arbitre : on repart toujours de la FEN en base,
 // jamais de ce que le client croit voir.
@@ -27,7 +50,7 @@ function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}) {
     throw new ErreurApi(400, 'Coup mal formé : il faut une case de départ et une case d\'arrivée (ex. e2, e4).');
   }
 
-  const echecs = new Chess(partie.fen);
+  const echecs = chargerPosition(partie);
   const monCamp = partie.blanc === joueurId ? 'w' : 'b';
   if (echecs.turn() !== monCamp) {
     throw new ErreurApi(409, 'Ce n\'est pas votre tour.');
@@ -50,11 +73,13 @@ function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}) {
 
   // Après le coup, chess.js dit si la partie est finie.
   // Le joueur qui vient de jouer (monCamp) gagne s'il y a mat.
+  // Le mat passe avant les nulles : un mat au 50e coup reste un mat.
+  const nulle = causeDeNulle(echecs);
   let enregistre;
   if (echecs.isCheckmate()) {
     enregistre = terminerPartie(partie, monCamp === 'w' ? 'blanc' : 'noir', 'mat', infosCoup);
-  } else if (echecs.isStalemate()) {
-    enregistre = terminerPartie(partie, 'nulle', 'pat', infosCoup);
+  } else if (nulle) {
+    enregistre = terminerPartie(partie, 'nulle', nulle, infosCoup);
   } else {
     enregistre = enregistrerCoup(infosCoup);
   }

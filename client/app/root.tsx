@@ -1,5 +1,6 @@
 import {
   isRouteErrorResponse,
+  Link,
   Links,
   Meta,
   Outlet,
@@ -63,9 +64,14 @@ export default function App({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <header className="flex items-center justify-between border-b px-4 py-3">
-        <span className="font-semibold">Chess-AppWeb</span>
+        <Link to="/" className="font-semibold">
+          Chess-AppWeb
+        </Link>
         {joueur ? (
           <div className="flex items-center gap-3">
+            <Link to="/historique" className="underline hover:no-underline">
+              Historique
+            </Link>
             <span>
               {joueur.nom} · <span className="font-mono">Elo {joueur.elo}</span>
             </span>
