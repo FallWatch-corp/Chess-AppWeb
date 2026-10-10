@@ -37,8 +37,23 @@ const updateTerminer = db.prepare(`
   UPDATE parties
   SET fen = COALESCE(?, fen), statut = 'terminee', resultat = ?, cause = ?,
       elo_blanc_avant = ?, elo_blanc_apres = ?,
-      elo_noir_avant = ?, elo_noir_apres = ?
+      elo_noir_avant = ?, elo_noir_apres = ?,
+      terminee_le = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
   WHERE id = ? AND fen = COALESCE(?, fen) AND statut = 'en_cours'
+`);
+
+// Les parties terminées d'un joueur, de la plus récente à la plus ancienne.
+// "id DESC" départage deux parties finies dans la même seconde.
+// ponytail: renvoie tout l'historique d'un coup, ajouter LIMIT/OFFSET si un joueur a des centaines de parties
+const selectTerminees = db.prepare(`
+  SELECT p.id, p.blanc, p.noir, p.resultat, p.cause, p.terminee_le,
+         p.elo_blanc_avant, p.elo_blanc_apres, p.elo_noir_avant, p.elo_noir_apres,
+         jb.nom AS nom_blanc, jn.nom AS nom_noir
+  FROM parties p
+  JOIN joueurs jb ON jb.id = p.blanc
+  JOIN joueurs jn ON jn.id = p.noir
+  WHERE p.statut = 'terminee' AND (p.blanc = ? OR p.noir = ?)
+  ORDER BY p.terminee_le DESC, p.id DESC
 `);
 
 // ordre = nombre de coups déjà joués + 1
@@ -117,6 +132,10 @@ function enregistrerFinDePartie({
   }
 }
 
+function listerPartiesTerminees(joueurId) {
+  return selectTerminees.all(joueurId, joueurId);
+}
+
 function listerCoups(partieId) {
   return selectCoups.all(partieId).map((ligne) => ligne.coup);
 }
@@ -129,4 +148,5 @@ module.exports = {
   enregistrerCoup,
   enregistrerFinDePartie,
   listerCoups,
+  listerPartiesTerminees,
 };

@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS parties (
   elo_blanc_avant   INTEGER,
   elo_blanc_apres   INTEGER,
   elo_noir_avant    INTEGER,
-  elo_noir_apres    INTEGER
+  elo_noir_apres    INTEGER,
+  terminee_le       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS coups (

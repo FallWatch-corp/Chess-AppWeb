@@ -3,7 +3,7 @@ const { exigerConnexion } = require('../middlewares/exiger-connexion.js');
 const { creerPartie, rejoindrePartie } = require('../services/parties.js');
 const { jouerCoup } = require('../services/coups.js');
 const { abandonner } = require('../services/fin-partie.js');
-const { trouverPartieParId, listerCoups } = require('../repository/parties.js');
+const { trouverPartieParId, listerCoups, listerPartiesTerminees } = require('../repository/parties.js');
 const { trouverJoueurParId } = require('../repository/joueurs.js');
 
 const router = express.Router();
@@ -18,6 +18,30 @@ router.post('/', (req, res) => {
 router.post('/rejoindre', (req, res) => {
   const resultat = rejoindrePartie(req.joueur.id, req.body?.code);
   res.json(resultat);
+});
+
+// L'historique : mes parties terminées, vues de mon côté (mon adversaire, ma couleur, mon Elo).
+router.get('/', (req, res) => {
+  const historique = listerPartiesTerminees(req.joueur.id).map((partie) => {
+    const jeSuisBlanc = partie.blanc === req.joueur.id;
+    const maCouleur = jeSuisBlanc ? 'blanc' : 'noir';
+    let resultat = 'nulle';
+    if (partie.resultat !== 'nulle') {
+      resultat = partie.resultat === maCouleur ? 'victoire' : 'defaite';
+    }
+
+    return {
+      id: partie.id,
+      adversaire: jeSuisBlanc ? partie.nom_noir : partie.nom_blanc,
+      couleur: maCouleur,
+      resultat,
+      cause: partie.cause,
+      eloAvant: jeSuisBlanc ? partie.elo_blanc_avant : partie.elo_noir_avant,
+      eloApres: jeSuisBlanc ? partie.elo_blanc_apres : partie.elo_noir_apres,
+      date: partie.terminee_le,
+    };
+  });
+  res.json(historique);
 });
 
 // Sert à afficher le code en attendant l'adversaire, puis l'échiquier (fen).
