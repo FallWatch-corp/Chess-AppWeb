@@ -8,6 +8,7 @@ import { useInterrogation } from "../hooks/useInterrogation";
 import { useThemeEchiquier } from "../hooks/useThemeEchiquier";
 import { Echiquier } from "../echiquier/Echiquier";
 import { SelecteurTheme } from "../echiquier/SelecteurTheme";
+import { ORDRE, calculerMateriel, type Materiel, type TypePiece } from "../pieces-prises";
 
 type Couleur = "blanc" | "noir";
 type JoueurPartie = { nom: string; elo: number };
@@ -122,6 +123,8 @@ function PartieEnCours({ partie }: { partie: Partie }) {
   const fenOptimiste = fetcher.formData?.get("fenApres");
   const fen = typeof fenOptimiste === "string" && fenOptimiste !== "" ? fenOptimiste : partie.fen;
   const peutJouer = enCours && partie.trait === partie.couleur && fetcher.state === "idle";
+    // Pièces prises et avantage matériel, calculés sur la position affichée
+  const materiel = calculerMateriel(fen);
 
   function abandonner() {
     if (!window.confirm("Abandonner la partie ? Elle sera comptée comme perdue.")) return;
@@ -154,14 +157,14 @@ function PartieEnCours({ partie }: { partie: Partie }) {
       ) : (
         <p className="text-lg font-medium">{messageTrait}</p>
       )}
-      <BandeauJoueur joueur={partie[adversaire]} couleur={adversaire} trait={trait} />
+      <BandeauJoueur joueur={partie[adversaire]} couleur={adversaire} trait={trait} materiel={materiel[adversaire]} />
       <Echiquier
         fen={fen}
         couleur={partie.couleur}
         theme={theme}
         onCoup={peutJouer ? jouer : undefined}
       />
-      <BandeauJoueur joueur={partie[moi]} couleur={moi} trait={trait} />
+            <BandeauJoueur joueur={partie[moi]} couleur={moi} trait={trait} materiel={materiel[moi]} />
       {enCours && partie.couleur && (
         <button
           type="button"
@@ -219,26 +222,65 @@ function BandeauJoueur({
   joueur,
   couleur,
   trait,
+  materiel,
 }: {
   joueur: JoueurPartie | null;
   couleur: Couleur;
   trait: Couleur | null;
+  materiel: Materiel;
 }) {
   return (
     <div className="flex w-full max-w-140 items-center justify-between">
-      <span className="flex items-center gap-2">
-        <span
-          aria-hidden
-          className={`inline-block size-3 rounded-full border border-gray-500 ${
-            couleur === "blanc" ? "bg-white" : "bg-gray-900"
-          }`}
-        />
-        <span className="sr-only">{couleur === "blanc" ? "Blancs :" : "Noirs :"}</span>
-        <span className="font-semibold">{joueur?.nom ?? "?"}</span>
-        <span className="font-mono text-gray-500">({joueur?.elo ?? "?"})</span>
-      </span>
+      <div className="flex flex-col gap-1">
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className={`inline-block size-3 rounded-full border border-gray-500 ${
+              couleur === "blanc" ? "bg-white" : "bg-gray-900"
+            }`}
+          />
+          <span className="sr-only">{couleur === "blanc" ? "Blancs :" : "Noirs :"}</span>
+          <span className="font-semibold">{joueur?.nom ?? "?"}</span>
+          <span className="font-mono text-gray-500">({joueur?.elo ?? "?"})</span>
+        </span>
+        <PiecesPrises prises={materiel.prises} avantage={materiel.avantage} />
+      </div>
       {trait === couleur && <span className="text-sm text-gray-500">au trait</span>}
     </div>
+  );
+}
+
+// Symboles des pièces prises (le "\uFE0E" empêche le pion d'apparaître en emoji)
+const SYMBOLES: Record<TypePiece, string> = { p: "♟\uFE0E", n: "♞", b: "♝", r: "♜", q: "♛" };
+const NOMS: Record<TypePiece, string> = { p: "pion", n: "cavalier", b: "fou", r: "tour", q: "dame" };
+
+function PiecesPrises({ prises, avantage }: { prises: TypePiece[]; avantage: number }) {
+  // Texte pour les lecteurs d'écran : "2 pions, 1 cavalier"
+  const description = ORDRE.filter((type) => prises.includes(type))
+    .map((type) => {
+      const nombre = prises.filter((p) => p === type).length;
+      return `${nombre} ${NOMS[type]}${nombre > 1 ? "s" : ""}`;
+    })
+    .join(", ");
+
+  return (
+    // hauteur minimale : l'échiquier ne bouge pas à la première prise
+    <span className="flex min-h-6 items-center gap-2">
+      {prises.length > 0 && (
+        <>
+          <span aria-hidden className="text-lg leading-none">
+            {prises.map((type) => SYMBOLES[type]).join("")}
+          </span>
+          <span className="sr-only">Pièces prises : {description}</span>
+        </>
+      )}
+      {avantage > 0 && (
+        <span className="font-mono text-sm text-gray-500">
+          <span aria-hidden>+{avantage}</span>
+          <span className="sr-only">Avantage matériel : {avantage}</span>
+        </span>
+      )}
+    </span>
   );
 }
 
