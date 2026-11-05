@@ -3,3 +3,26 @@
 !.env.example
 node_modules/
 server/data/
+
+# Fichiers d'assistants IA (configuration locale, jamais versionnée)
+.agents/
+.claude/
+.cursor/
+.cursorrules
+.cursorignore
+.windsurf/
+.windsurfrules
+.codex/
+.gemini/
+.aider*
+.continue/
+.clinerules
+.roo/
+.kiro/
+.junie/
+.mcp.json
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.github/copilot-instructions.md
