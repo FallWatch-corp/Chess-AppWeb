@@ -19,6 +19,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const urlApi = process.env.URL_API ?? "http://localhost:3000";
   return {
     joueur: await obtenirJoueurConnecte(request),
+    // utilisée aussi par le navigateur pour ouvrir la connexion Socket.IO
+    urlApi,
     urlConnexion: `${urlApi}/api/auth/login`,
     urlDeconnexion: `${urlApi}/api/auth/logout`,
   };
