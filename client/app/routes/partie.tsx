@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { redirect, useFetcher } from "react-router";
+import { redirect, useFetcher, useRouteLoaderData } from "react-router";
 import { Chess } from "chess.js";
 import type { Route } from "./+types/partie";
 import { appelerApi } from "../api.server";
@@ -9,6 +9,8 @@ import { useThemeEchiquier } from "../hooks/useThemeEchiquier";
 import { Echiquier } from "../echiquier/Echiquier";
 import { SelecteurTheme } from "../echiquier/SelecteurTheme";
 import { ORDRE, calculerMateriel, type Materiel, type TypePiece } from "../pieces-prises";
+import { usePartieEnDirect } from "../hooks/usePartieEnDirect";
+import type { loader as rootLoader } from "../root";
 
 type Couleur = "blanc" | "noir";
 type JoueurPartie = { nom: string; elo: number };
@@ -78,11 +80,13 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function PagePartie({ loaderData }: Route.ComponentProps) {
-  const { partie } = loaderData;
+  // L'adresse publique de l'API vient du loader racine (lue au démarrage, pas figée au build).
+  const racine = useRouteLoaderData<typeof rootLoader>("root");
+  // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie.
+  const { partie } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
 
-  // On redemande l'état de la partie à l'API toutes les 2 s : en attente pour voir
-  // l'adversaire arriver, puis pendant la partie pour voir ses coups.
-  // Ça s'arrête quand la partie est terminée, ou quand on quitte la page (nettoyage du hook).
+  // Filet de sécurité gardé jusqu'à #49 : on redemande aussi l'état toutes les 2 s.
+  // #49 le retirera une fois le temps réel vérifié de bout en bout.
   useInterrogation(partie.statut !== "terminee");
 
   if (partie.statut !== "en_attente") {

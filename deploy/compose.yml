@@ -17,7 +17,10 @@ services:
     ports:
       - "5173:3000"
     environment:
+      # API_URL : adresse de l'API pour le serveur React, à l'intérieur du réseau Docker
       API_URL: http://server:3000
+      # URL_API : adresse de l'API vue par le navigateur (connexion GitHub, Socket.IO)
+      URL_API: ${URL_API}
     depends_on:
       - server
 

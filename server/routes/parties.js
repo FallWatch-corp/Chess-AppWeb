@@ -3,8 +3,9 @@ const { exigerConnexion } = require('../middlewares/exiger-connexion.js');
 const { creerPartie, rejoindrePartie } = require('../services/parties.js');
 const { jouerCoup } = require('../services/coups.js');
 const { abandonner } = require('../services/fin-partie.js');
-const { trouverPartieParId, listerCoups, listerPartiesTerminees } = require('../repository/parties.js');
-const { trouverJoueurParId } = require('../repository/joueurs.js');
+const { etatPartie } = require('../services/etat-partie.js');
+const { trouverPartieParId, listerPartiesTerminees } = require('../repository/parties.js');
+const { diffuserPartie } = require('../temps-reel/diffusion.js');
 
 const router = express.Router();
 
@@ -15,9 +16,11 @@ router.post('/', (req, res) => {
   res.status(201).json(partie);
 });
 
+// La diffusion prévient le créateur, qui attend dans la salle d'attente, et lui donne sa couleur.
 router.post('/rejoindre', (req, res) => {
   const resultat = rejoindrePartie(req.joueur.id, req.body?.code);
   res.json(resultat);
+  diffuserPartie(resultat.id).catch(console.error);
 });
 
 // L'historique : mes parties terminées, vues de mon côté (mon adversaire, ma couleur, mon Elo).
@@ -47,16 +50,21 @@ router.get('/', (req, res) => {
 // Sert à afficher le code en attendant l'adversaire, puis l'échiquier (fen).
 router.get('/:id', envoyerPartie);
 
-// Le coup est validé par chess.js dans le service ; on renvoie la partie à jour.
+// Le coup est validé par chess.js dans le service ; on renvoie la partie à jour,
+// puis on la diffuse au salon (adversaire et spectateurs) sans faire attendre la réponse.
 router.post('/:id/coups', (req, res) => {
-  jouerCoup(Number(req.params.id), req.joueur.id, req.body ?? {});
+  const partieId = Number(req.params.id);
+  jouerCoup(partieId, req.joueur.id, req.body ?? {});
   envoyerPartie(req, res);
+  diffuserPartie(partieId).catch(console.error);
 });
 
-// L'adversaire voit l'abandon au prochain GET (interrogation toutes les 2 s).
+// L'adversaire et les spectateurs reçoivent l'abandon par Socket.IO.
 router.post('/:id/abandon', (req, res) => {
-  abandonner(Number(req.params.id), req.joueur.id);
+  const partieId = Number(req.params.id);
+  abandonner(partieId, req.joueur.id);
   envoyerPartie(req, res);
+  diffuserPartie(partieId).catch(console.error);
 });
 
 function envoyerPartie(req, res) {
@@ -69,45 +77,7 @@ function envoyerPartie(req, res) {
   if (!participants.includes(req.joueur.id)) {
     return res.status(403).json({ erreur: 'Vous ne participez pas à cette partie.' });
   }
-
-  // couleur reste null tant que l'adversaire n'a pas rejoint
-  let couleur = null;
-  if (partie.blanc === req.joueur.id) couleur = 'blanc';
-  if (partie.noir === req.joueur.id) couleur = 'noir';
-
-  const { id, code, statut, fen } = partie;
-  res.json({
-    id,
-    code,
-    statut,
-    couleur,
-    fen,
-    // dans une FEN, le 2e champ dit qui doit jouer : w (blancs) ou b (noirs)
-    trait: fen.split(' ')[1] === 'b' ? 'noir' : 'blanc',
-    blanc: joueurPublic(partie.blanc),
-    noir: joueurPublic(partie.noir),
-    coups: listerCoups(id),
-    fin: finPublique(partie),
-  });
-}
-
-// null tant que la partie n'est pas terminée.
-// Les Elo viennent de la partie et pas du joueur : son Elo actuel a pu changer depuis.
-function finPublique(partie) {
-  if (partie.statut !== 'terminee') return null;
-  return {
-    resultat: partie.resultat,
-    cause: partie.cause,
-    eloBlanc: { avant: partie.elo_blanc_avant, apres: partie.elo_blanc_apres },
-    eloNoir: { avant: partie.elo_noir_avant, apres: partie.elo_noir_apres },
-  };
-}
-
-// null tant que personne n'a cette couleur (partie en attente)
-function joueurPublic(joueurId) {
-  if (joueurId === null) return null;
-  const { nom, elo } = trouverJoueurParId(joueurId);
-  return { nom, elo };
+  res.json(etatPartie(partie, req.joueur.id));
 }
 
 module.exports = router;
