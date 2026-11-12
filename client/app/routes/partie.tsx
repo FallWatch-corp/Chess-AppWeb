@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { redirect, useFetcher, useRouteLoaderData } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { redirect, useFetcher, useRevalidator, useRouteLoaderData } from "react-router";
 import { Chess } from "chess.js";
 import type { Route } from "./+types/partie";
 import { appelerApi } from "../api.server";
 import { CAUSES, formaterVariation } from "../fin-partie";
-import { useInterrogation } from "../hooks/useInterrogation";
 import { useThemeEchiquier } from "../hooks/useThemeEchiquier";
 import { Echiquier } from "../echiquier/Echiquier";
 import { SelecteurTheme } from "../echiquier/SelecteurTheme";
@@ -85,9 +84,13 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
   // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie.
   const { partie } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
 
-  // Filet de sécurité gardé jusqu'à #49 : on redemande aussi l'état toutes les 2 s.
-  // #49 le retirera une fois le temps réel vérifié de bout en bout.
-  useInterrogation(partie.statut !== "terminee");
+  const revalidator = useRevalidator();
+  const terminee = partie.statut === "terminee";
+  const etaitTerminee = useRef(terminee);
+  useEffect(() => {
+    if (terminee && !etaitTerminee.current) revalidator.revalidate();
+    etaitTerminee.current = terminee;
+  }, [terminee, revalidator]);
 
   if (partie.statut !== "en_attente") {
     return <PartieEnCours partie={partie} />;
