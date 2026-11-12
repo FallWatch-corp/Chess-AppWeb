@@ -115,3 +115,24 @@ test('le coup joué par alice en HTTP arrive à bob par Socket.IO', { timeout: 5
   // l'état est calculé pour bob : il garde sa couleur
   assert.equal(etat.couleur, 'noir');
 });
+
+test('alice attend dans la salle d\'attente et reçoit l\'arrivée de bob par Socket.IO', { timeout: 5000 }, async (t) => {
+  const partie = creerPartie(alice.id);
+  const socketAlice = connecterSocket(serveur.url, cookiePour(alice.id));
+  t.after(() => socketAlice.close());
+  const { etat: enAttente } = await rejoindre(socketAlice, partie.id);
+  assert.equal(enAttente.statut, 'en_attente');
+
+  const etatApresArrivee = attendre(socketAlice, 'partie:etat');
+  await request(serveur.url)
+    .post('/api/parties/rejoindre')
+    .set('Cookie', cookiePour(bob.id))
+    .send({ code: partie.code })
+    .expect(200);
+  const etat = await etatApresArrivee;
+
+  assert.equal(etat.statut, 'en_cours');
+  assert.ok(['blanc', 'noir'].includes(etat.couleur));
+  assert.equal(etat[etat.couleur].nom, 'alice');
+  assert.equal(etat[etat.couleur === 'blanc' ? 'noir' : 'blanc'].nom, 'bob');
+});
