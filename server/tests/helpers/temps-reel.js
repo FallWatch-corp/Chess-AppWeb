@@ -4,7 +4,11 @@ const { brancherTempsReel } = require('../../temps-reel/index.js');
 const { writeSession } = require('../../session.js');
 
 // Démarre un vrai serveur HTTP + Socket.IO sur un port libre.
+// Les console.log du serveur (Connexion…, Déconnexion…) sont coupés : écrits au milieu
+// des résultats que node --test relit, ils peuvent les rendre illisibles
+// (« Unable to deserialize cloned data ») et faire échouer un fichier dont tous les tests passent.
 async function demarrerServeur(app) {
+  console.log = () => {};
   const serveurHttp = http.createServer(app);
   const io = brancherTempsReel(serveurHttp);
   await new Promise((ok) => serveurHttp.listen(0, ok));

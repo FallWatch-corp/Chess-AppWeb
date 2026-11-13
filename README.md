@@ -352,7 +352,7 @@ Joueurs et spectateurs discutent sous l'échiquier, en salle d'attente, pendant 
 
 - **Une seule instance du serveur.** Les salons vivent en mémoire, dans le processus Node. Avec deux instances derrière un répartiteur de charge, une diffusion n'atteindrait que les clients de la même instance. Il faudrait l'adaptateur Redis de Socket.IO (`@socket.io/redis-adapter`) et des sessions persistantes (*sticky sessions*).
 - **Déconnexion dans un autre onglet.** `/logout` efface le cookie, mais un socket déjà ouvert dans un autre onglet garde son identité jusqu'à sa fermeture. Il ne peut plus jouer (les actions passent par HTTP), mais il reçoit encore les diffusions et peut encore écrire dans le clavardage. Correction possible : fermer les sockets du salon `joueur:<id>` au `/logout`.
-- **Limite de débit du clavardage en mémoire.** Elle est perdue au redémarrage (sans gravité) et ne serait pas partagée entre plusieurs instances du serveur.
+- **Limite de débit du clavardage en mémoire.** Elle est perdue au redémarrage (sans gravité) et ne serait pas partagée entre plusieurs instances du serveur. La `Map` qui la garde (`derniersMessages`) n'est jamais vidée : une entrée par joueur ayant écrit depuis le démarrage, ce qui reste négligeable à notre échelle.
 - **Historique limité.** Seuls les 50 derniers messages sont envoyés en arrivant ; les plus anciens restent en base mais ne sont pas affichés.
 - **Spectateurs et clavardage.** Le panneau est prêt pour les spectateurs (lecture, invitation à se connecter), mais ils ne peuvent ouvrir la page d'une partie qu'avec #55.
 - **Deux sources pour l'affichage.** La réponse HTTP et la diffusion mettent toutes deux la page à jour ; si elles arrivaient dans le désordre, un état plus ancien pourrait s'afficher brièvement.

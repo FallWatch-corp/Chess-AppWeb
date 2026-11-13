@@ -139,7 +139,17 @@ test('on ne peut pas écrire dans une partie qu\'on n\'a pas rejointe', { timeou
 
   assert.match((await envoyer(socket, id, 'Bonjour')).erreur, /Rejoignez/);
   // un message mal formé ne fait pas planter le serveur
-  assert.match((await socket.emitWithAck('clavardage:envoyer', null)).erreur, /Rejoignez/);
+  assert.equal((await socket.emitWithAck('clavardage:envoyer', null)).erreur, 'Identifiant invalide.');
+});
+
+test('l\'identifiant de la partie doit être un entier, même pour qui a rejoint le salon', { timeout: 5000 }, async (t) => {
+  const [alice, bob] = ['alice', 'bob'].map(nouveauJoueur);
+  const id = partieEntre(alice, bob);
+  const { socket } = await entrer(t, id, alice);
+
+  // "12" passerait le test du salon (`partie:12`) : il doit être refusé avant
+  assert.equal((await envoyer(socket, String(id), 'Bonjour')).erreur, 'Identifiant invalide.');
+  assert.deepEqual(listerMessagesRecents(id), []);
 });
 
 test('l\'historique enregistré en base est envoyé à l\'arrivée dans la partie', { timeout: 5000 }, async (t) => {

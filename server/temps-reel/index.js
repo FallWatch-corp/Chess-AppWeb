@@ -45,6 +45,8 @@ function brancherTempsReel(serveurHttp) {
     socket.on('clavardage:envoyer', (message, repondre) => {
       if (typeof repondre !== 'function') return;
       const partieId = message?.partieId;
+      // Comme pour partie:rejoindre : sans ce test, "12" passerait le test du salon (`partie:12`).
+      if (!Number.isInteger(partieId)) return repondre({ erreur: 'Identifiant invalide.' });
       // On n'écrit que dans une partie qu'on a rejointe (donc qu'on lit).
       if (!socket.rooms.has(`partie:${partieId}`)) {
         return repondre({ erreur: 'Rejoignez d\'abord la partie.' });
