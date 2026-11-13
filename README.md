@@ -279,11 +279,10 @@ Le même parcours vaut pour l'abandon et pour l'arrivée de l'adversaire dans la
 | --- | --- | --- | --- |
 | `partie:rejoindre` | client → serveur | l'id de la partie, et un accusé de réception | Entrer dans le salon `partie:<id>`. Réponse `{ ok: true }` ou `{ erreur }` |
 | `partie:etat` | serveur → client | l'état complet de la partie (le même objet que `GET /api/parties/:id`) | Envoyé à l'arrivée dans le salon, puis à chaque changement |
-| `clavardage:historique` | serveur → client | les 50 derniers messages de la partie | Envoyé à ce socket seulement, juste après `partie:etat`, à chaque `partie:rejoindre` (donc aussi à chaque reconnexion) |
-| `clavardage:envoyer` | client → serveur | `{ partieId, texte }`, et un accusé de réception | Écrire dans le clavardage. Réponse `{ ok: true }` ou `{ erreur }` |
-| `clavardage:message` | serveur → salon | `{ id, auteur, role, texte, envoyeLe }` | Un nouveau message, envoyé à tout le salon, auteur compris |
 
 L'état est fabriqué à un seul endroit, `server/services/etat-partie.js`, utilisé à la fois par la route HTTP et par Socket.IO : les deux chemins envoient toujours le même format.
+
+Les événements du clavardage sont décrits plus bas, dans [Le clavardage](#le-clavardage).
 
 ### Les salons
 
@@ -317,6 +316,14 @@ Le prix de ce choix : un joueur reçoit son propre coup deux fois (la réponse H
 Joueurs et spectateurs discutent sous l'échiquier, en salle d'attente, pendant et après la partie.
 
 **Pourquoi l'envoi passe par Socket.IO, contrairement aux actions.** Un message ne modifie pas la partie : il n'y a ni règle du jeu à vérifier, ni loader à recharger. Un accusé de réception (`{ ok }` ou `{ erreur }`) suffit à dire à l'auteur si son message est refusé, et la connexion est déjà ouverte vers le bon salon.
+
+#### Les événements du clavardage
+
+| Événement | Sens | Contenu | Rôle |
+| --- | --- | --- | --- |
+| `clavardage:historique` | serveur → client | les 50 derniers messages de la partie | Envoyé à ce socket seulement, juste après `partie:etat`, à chaque `partie:rejoindre` (donc aussi à chaque reconnexion) |
+| `clavardage:envoyer` | client → serveur | `{ partieId, texte }`, et un accusé de réception | Écrire dans le clavardage. Réponse `{ ok: true }` ou `{ erreur }` |
+| `clavardage:message` | serveur → salon | `{ id, auteur, role, texte, envoyeLe }` | Un nouveau message, envoyé à tout le salon, auteur compris |
 
 #### Le parcours d'un message
 
