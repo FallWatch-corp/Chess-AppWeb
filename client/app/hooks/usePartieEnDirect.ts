@@ -71,11 +71,16 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
     async (texte: string): Promise<string | null> => {
       const socket = socketRef.current;
       if (!socket?.connected) return "Connexion perdue, réessayez dans un instant.";
-      const reponse: { ok?: true; erreur?: string } = await socket.emitWithAck("clavardage:envoyer", {
-        partieId: partieInitiale.id,
-        texte,
-      });
-      return reponse.erreur ?? null;
+      try {
+        // emitWithAck rejette si la connexion tombe pendant l'envoi ; timeout : il rejette aussi
+        // si le serveur ne répond plus. Sans ce try, le bouton Envoyer resterait bloqué.
+        const reponse: { ok?: true; erreur?: string } = await socket
+          .timeout(5000)
+          .emitWithAck("clavardage:envoyer", { partieId: partieInitiale.id, texte });
+        return reponse.erreur ?? null;
+      } catch {
+        return "Connexion perdue, réessayez dans un instant.";
+      }
     },
     [partieInitiale.id],
   );

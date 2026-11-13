@@ -16,13 +16,14 @@ export function Clavardage({ messages, estConnecte, ferme, urlConnexion, envoyer
   const [texte, setTexte] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const [enEnvoi, setEnEnvoi] = useState(false);
-  const fin = useRef<HTMLLIElement>(null);
+  const liste = useRef<HTMLUListElement>(null);
 
-  // On garde le dernier message visible.
-  // Les accolades comptent : un effet ne doit rien renvoyer d'autre qu'une fonction de nettoyage,
-  // et scrollIntoView renvoie une Promise dans les navigateurs récents (React planterait au rendu suivant).
+  // On garde le dernier message visible en faisant défiler la liste seulement.
+  // Pas de scrollIntoView : il fait aussi défiler la page, et un joueur qui regarde l'échiquier
+  // serait emmené vers le bas à chaque message reçu.
+  // Les accolades comptent : un effet ne doit rien renvoyer d'autre qu'une fonction de nettoyage.
   useEffect(() => {
-    fin.current?.scrollIntoView({ block: "nearest" });
+    if (liste.current) liste.current.scrollTop = liste.current.scrollHeight;
   }, [messages]);
 
   async function soumettre(evenement: FormEvent) {
@@ -37,7 +38,8 @@ export function Clavardage({ messages, estConnecte, ferme, urlConnexion, envoyer
   return (
     <section aria-label="Clavardage" className="flex w-full max-w-md flex-col gap-2 rounded border p-3">
       <h2 className="font-semibold">Clavardage</h2>
-      <ul className="h-48 overflow-y-auto text-sm">
+      {/* aria-live : les lecteurs d'écran annoncent les nouveaux messages sans que l'on quitte l'échiquier */}
+      <ul ref={liste} aria-live="polite" className="h-48 overflow-y-auto text-sm">
         {messages.length === 0 && <li className="text-gray-500">Aucun message pour l'instant.</li>}
         {messages.map((m) => (
           // {m.texte} est échappé par React : un "<script>" s'affiche comme du texte.
@@ -46,7 +48,6 @@ export function Clavardage({ messages, estConnecte, ferme, urlConnexion, envoyer
             <span className="text-gray-500">({ROLES[m.role]})</span> : {m.texte}
           </li>
         ))}
-        <li ref={fin} />
       </ul>
 
       {ferme ? (
