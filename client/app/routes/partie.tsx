@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { redirect, useFetcher, useRevalidator, useRouteLoaderData } from "react-router";
 import { Chess } from "chess.js";
 import type { Route } from "./+types/partie";
@@ -9,6 +9,7 @@ import { Echiquier } from "../echiquier/Echiquier";
 import { SelecteurTheme } from "../echiquier/SelecteurTheme";
 import { ORDRE, calculerMateriel, type Materiel, type TypePiece } from "../pieces-prises";
 import { usePartieEnDirect } from "../hooks/usePartieEnDirect";
+import { Clavardage } from "../clavardage/Clavardage";
 import type { loader as rootLoader } from "../root";
 
 type Couleur = "blanc" | "noir";
@@ -81,8 +82,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function PagePartie({ loaderData }: Route.ComponentProps) {
   // L'adresse publique de l'API vient du loader racine (lue au démarrage, pas figée au build).
   const racine = useRouteLoaderData<typeof rootLoader>("root");
-  // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie.
-  const { partie } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
+  // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie,
+  // ainsi que les messages du clavardage (même socket, même salon).
+  const { partie, messages, envoyerMessage } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
 
   const revalidator = useRevalidator();
   const terminee = partie.statut === "terminee";
@@ -92,8 +94,20 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
     etaitTerminee.current = terminee;
   }, [terminee, revalidator]);
 
+  // Construit une seule fois, affiché en salle d'attente comme pendant et après la partie.
+  // estConnecte vient de la session (loader racine) : un anonyme lit, mais est invité à se connecter.
+  const clavardage = (
+    <Clavardage
+      messages={messages}
+      estConnecte={Boolean(racine!.joueur)}
+      ferme={terminee}
+      urlConnexion={racine!.urlConnexion}
+      envoyer={envoyerMessage}
+    />
+  );
+
   if (partie.statut !== "en_attente") {
-    return <PartieEnCours partie={partie} />;
+    return <PartieEnCours partie={partie}>{clavardage}</PartieEnCours>;
   }
 
   return (
@@ -107,11 +121,13 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
         <BoutonCopier texte={partie.code} />
       </div>
       <p className="text-gray-500">En attente de votre adversaire…</p>
+      {clavardage}
     </main>
   );
 }
 
-function PartieEnCours({ partie }: { partie: Partie }) {
+// children : le panneau de clavardage, affiché sous l'échiquier.
+function PartieEnCours({ partie, children }: { partie: Partie; children: ReactNode }) {
   const [theme, setTheme] = useThemeEchiquier();
   const fetcher = useFetcher<typeof action>();
   // comme sur l'échiquier : l'adversaire en haut, moi en bas
@@ -188,6 +204,7 @@ function PartieEnCours({ partie }: { partie: Partie }) {
         </p>
       )}
       <SelecteurTheme theme={theme} onChange={setTheme} />
+      {children}
     </main>
   );
 }

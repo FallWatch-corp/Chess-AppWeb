@@ -2,6 +2,8 @@ const { Server } = require('socket.io');
 const { authentifierSocket } = require('./authentification.js');
 const { trouverPartieParId } = require('../repository/parties.js');
 const { etatPartie } = require('../services/etat-partie.js');
+const { envoyerMessage, historique } = require('../services/clavardage.js');
+const { ErreurApi } = require('../services/erreur-api.js');
 const { enregistrerIo } = require('./diffusion.js');
 
 function brancherTempsReel(serveurHttp) {
@@ -34,6 +36,32 @@ function brancherTempsReel(serveurHttp) {
       repondre({ ok: true });
       // Seulement à ce socket : il arrive et a besoin de l'état complet.
       socket.emit('partie:etat', etatPartie(partie, socket.data.joueur?.id ?? null));
+
+      // L'historique arrive à chaque (re)connexion : rien de manqué pendant une coupure.
+      socket.emit('clavardage:historique', historique(partie));
+    });
+
+    // Le message ne contient que partieId et texte : l'auteur vient toujours de socket.data.
+    socket.on('clavardage:envoyer', (message, repondre) => {
+      if (typeof repondre !== 'function') return;
+      const partieId = message?.partieId;
+      // Comme pour partie:rejoindre : sans ce test, "12" passerait le test du salon (`partie:12`).
+      if (!Number.isInteger(partieId)) return repondre({ erreur: 'Identifiant invalide.' });
+      // On n'écrit que dans une partie qu'on a rejointe (donc qu'on lit).
+      if (!socket.rooms.has(`partie:${partieId}`)) {
+        return repondre({ erreur: 'Rejoignez d\'abord la partie.' });
+      }
+
+      try {
+        const publie = envoyerMessage(partieId, socket.data.joueur, message.texte);
+        // À tout le salon, l'auteur compris : son message s'affiche comme celui des autres.
+        io.to(`partie:${partieId}`).emit('clavardage:message', publie);
+        repondre({ ok: true });
+      } catch (erreur) {
+        // Une exception dans un gestionnaire Socket.IO ferait planter le serveur : on la rattrape toujours.
+        if (!(erreur instanceof ErreurApi)) console.error(erreur);
+        repondre({ erreur: erreur instanceof ErreurApi ? erreur.message : 'Erreur interne.' });
+      }
     });
 
     socket.on('disconnect', (raison) => console.log('Déconnexion', socket.id, raison));
