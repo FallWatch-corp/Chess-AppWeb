@@ -1,3 +1,4 @@
+const { setTimeout, clearTimeout } = require('node:timers');
 const http = require('node:http');
 const { io: connecter } = require('socket.io-client');
 const { brancherTempsReel } = require('../../temps-reel/index.js');
@@ -33,4 +34,22 @@ function attendre(socket, evenement) {
   return new Promise((ok) => socket.once(evenement, ok));
 }
 
-module.exports = { demarrerServeur, cookiePour, connecterSocket, attendre };
+// Attend le premier événement de ce nom qui respecte la condition, sans attendre indéfiniment :
+// si rien n'arrive avant le délai, le test échoue avec un message clair au lieu de rester bloqué.
+function attendreQue(socket, evenement, condition, delai = 1000) {
+  return new Promise((ok, echec) => {
+    const minuterie = setTimeout(() => {
+      socket.off(evenement, ecouter);
+      echec(new Error(`« ${evenement} » attendu, rien reçu en ${delai} ms.`));
+    }, delai);
+    function ecouter(donnees) {
+      if (!condition(donnees)) return;
+      clearTimeout(minuterie);
+      socket.off(evenement, ecouter);
+      ok(donnees);
+    }
+    socket.on(evenement, ecouter);
+  });
+}
+
+module.exports = { demarrerServeur, cookiePour, connecterSocket, attendre, attendreQue };
