@@ -279,6 +279,7 @@ Le même parcours vaut pour l'abandon et pour l'arrivée de l'adversaire dans la
 | --- | --- | --- | --- |
 | `partie:rejoindre` | client → serveur | l'id de la partie, et un accusé de réception | Entrer dans le salon `partie:<id>`. Réponse `{ ok: true }` ou `{ erreur }` |
 | `partie:etat` | serveur → client | l'état complet de la partie (le même objet que `GET /api/parties/:id`) | Envoyé à l'arrivée dans le salon, puis à chaque changement |
+| `partie:coup`, `partie:abandon` | client → serveur | `{ partieId }`, et un accusé de réception | Toujours refusés, la partie n'est jamais modifiée. Réponse selon `socket.data` : « Vous devez être connecté. », « Vous ne participez pas à cette partie. » ou, pour un joueur, « Les coups et l'abandon se font par HTTP. » |
 
 L'état est fabriqué à un seul endroit, `server/services/etat-partie.js`, utilisé à la fois par la route HTTP et par Socket.IO : les deux chemins envoient toujours le même format.
 
