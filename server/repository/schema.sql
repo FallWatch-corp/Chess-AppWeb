@@ -30,3 +30,17 @@ CREATE TABLE IF NOT EXISTS coups (
   coup       TEXT NOT NULL,
   UNIQUE (partie, ordre)
 );
+
+CREATE TABLE IF NOT EXISTS messages (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  partie     INTEGER NOT NULL REFERENCES parties(id),
+  auteur     INTEGER NOT NULL REFERENCES joueurs(id),
+  texte      TEXT NOT NULL CHECK (length(texte) BETWEEN 1 AND 300),
+  envoye_le  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- l'historique se lit toujours par partie, du plus récent au plus ancien
+CREATE INDEX IF NOT EXISTS messages_par_partie ON messages (partie, id);
+
+-- l'historique se lit toujours par partie, du plus récent au plus ancien
+CREATE INDEX IF NOT EXISTS messages_par_partie ON messages (partie, id);
