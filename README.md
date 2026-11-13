@@ -132,7 +132,7 @@ Ces commandes ne demandent ni `server/.env` ni application OAuth :
 - chaque fichier de test utilise **sa propre base SQLite temporaire** (`server/tests/helpers/base-temporaire.js`), et ta base de développement n'est jamais touchée ;
 - **GitHub est simulé** : `server/tests/auth.test.js` remplace `fetch` par un faux GitHub ;
 - les tests envoient de vraies requêtes HTTP à l'application Express avec `supertest`, sans ouvrir de port ;
-- les tests du temps réel (`server/tests/temps-reel.test.js`) démarrent un vrai serveur HTTP + Socket.IO sur un port libre et s'y connectent avec `socket.io-client`, avec un vrai cookie signé (`server/tests/helpers/temps-reel.js`).
+- les tests du temps réel (`server/tests/temps-reel.test.js` et `server/tests/clavardage.test.js`) démarrent un vrai serveur HTTP + Socket.IO sur un port libre et s'y connectent avec `socket.io-client`, avec un vrai cookie signé (`server/tests/helpers/temps-reel.js`).
 
 Pour lancer un seul fichier : `node --test tests/parties-coups.test.js` depuis le dossier `server`.
 
@@ -279,6 +279,9 @@ Le même parcours vaut pour l'abandon et pour l'arrivée de l'adversaire dans la
 | --- | --- | --- | --- |
 | `partie:rejoindre` | client → serveur | l'id de la partie, et un accusé de réception | Entrer dans le salon `partie:<id>`. Réponse `{ ok: true }` ou `{ erreur }` |
 | `partie:etat` | serveur → client | l'état complet de la partie (le même objet que `GET /api/parties/:id`) | Envoyé à l'arrivée dans le salon, puis à chaque changement |
+| `clavardage:historique` | serveur → client | les 50 derniers messages de la partie | Envoyé à ce socket seulement, juste après `partie:etat`, à chaque `partie:rejoindre` (donc aussi à chaque reconnexion) |
+| `clavardage:envoyer` | client → serveur | `{ partieId, texte }`, et un accusé de réception | Écrire dans le clavardage. Réponse `{ ok: true }` ou `{ erreur }` |
+| `clavardage:message` | serveur → salon | `{ id, auteur, role, texte, envoyeLe }` | Un nouveau message, envoyé à tout le salon, auteur compris |
 
 L'état est fabriqué à un seul endroit, `server/services/etat-partie.js`, utilisé à la fois par la route HTTP et par Socket.IO : les deux chemins envoient toujours le même format.
 
@@ -303,14 +306,46 @@ L'énoncé laisse le choix : jouer un coup et abandonner passent par HTTP ou par
 
 - **Un vrai code de réponse.** Un coup refusé renvoie `400`, `403`, `409` ou `422` avec un message, et le client sait que *son* action a échoué. Avec Socket.IO, il faudrait réinventer ces réponses avec des accusés de réception.
 - **Rien à réécrire.** Les routes, la validation et les tests d'intégration du projet 1 restent valables tels quels.
-- **Une seule porte d'entrée pour modifier une partie.** Les règles (tour, joueur de la partie, coup légal) sont vérifiées à un seul endroit, les services, appelés uniquement par les routes HTTP. Socket.IO ne peut rien modifier : un spectateur ne peut donc pas jouer par ce chemin.
+- **Une seule porte d'entrée pour modifier une partie.** Les règles (tour, joueur de la partie, coup légal) sont vérifiées à un seul endroit, les services, appelés uniquement par les routes HTTP. Socket.IO ne peut modifier aucune partie : un spectateur ne peut donc pas jouer par ce chemin. (Le clavardage écrit par Socket.IO, mais seulement dans la table `messages` : voir [Le clavardage](#le-clavardage).)
 - **L'identité reste celle de la requête.** Chaque requête HTTP porte le cookie du moment. Si le joueur se déconnecte dans un onglet, un autre onglet resté ouvert ne peut plus jouer, même si son socket est encore ouvert.
 - **La diffusion n'est pas bloquante.** Le coup est enregistré avant d'être diffusé. Si la diffusion échouait, le coup resterait valide, et le client le verrait au prochain rechargement.
 
 Le prix de ce choix : un joueur reçoit son propre coup deux fois (la réponse HTTP et la diffusion). C'est sans effet, puisque c'est le même état et que le client remplace simplement l'ancien.
 
+### Le clavardage
+
+Joueurs et spectateurs discutent sous l'échiquier, en salle d'attente, pendant et après la partie.
+
+**Pourquoi l'envoi passe par Socket.IO, contrairement aux actions.** Un message ne modifie pas la partie : il n'y a ni règle du jeu à vérifier, ni loader à recharger. Un accusé de réception (`{ ok }` ou `{ erreur }`) suffit à dire à l'auteur si son message est refusé, et la connexion est déjà ouverte vers le bon salon.
+
+#### Le parcours d'un message
+
+1. Bob tape un message : le client émet `clavardage:envoyer` avec `{ partieId, texte }` (`envoyerMessage` dans `usePartieEnDirect`).
+2. `server/temps-reel/index.js` vérifie que ce socket a bien rejoint le salon `partie:<partieId>` : on n'écrit que dans une partie qu'on lit.
+3. `envoyerMessage` (`server/services/clavardage.js`) applique les règles, puis enregistre le message en base (`server/repository/messages.js`).
+4. Le message est diffusé avec `io.to('partie:<id>')`, donc **à tout le salon, auteur compris**. Le client n'ajoute jamais un message au moment de l'envoyer : il l'ajoute en le recevant, tel que le serveur l'a validé.
+
+#### Les règles, vérifiées par le serveur
+
+| Règle | Refus |
+| --- | --- |
+| L'auteur vient de `socket.data.joueur` (la session), jamais du message | — |
+| Un anonyme lit, mais n'écrit pas ; le panneau l'invite à se connecter | `Connectez-vous pour écrire.` |
+| Texte non vide une fois les espaces retirés, 300 caractères au maximum (aussi garanti par un `CHECK` en base) | `Le message est vide.` / `Le message dépasse 300 caractères.` |
+| Un message par seconde **par joueur** (et pas par onglet) | `Doucement : un message par seconde au maximum.` |
+| Après la fin de la partie, lecture seule | `La partie est terminée : le clavardage est en lecture seule.` |
+
+**Le rôle affiché** (Blancs, Noirs, Spectateur) n'est pas enregistré : il est calculé à chaque lecture à partir de la partie. Le créateur qui écrit en salle d'attente n'a pas encore de couleur et apparaît comme « Joueur » ; ses messages afficheront sa couleur une fois la partie commencée.
+
+**Pas de HTML injecté.** Le serveur enregistre le texte tel quel ; c'est l'affichage qui protège : React échappe `{m.texte}`, et le client n'utilise jamais `dangerouslySetInnerHTML`. Un `<script>` s'affiche donc comme du texte.
+
+**L'historique** est relu en base à chaque `partie:rejoindre` : il est reçu en arrivant, après une coupure et après un redémarrage du serveur. Le client *remplace* sa liste par l'historique (pas de doublons à la reconnexion) et *ajoute* chaque `clavardage:message`.
+
 ### Limites connues
 
 - **Une seule instance du serveur.** Les salons vivent en mémoire, dans le processus Node. Avec deux instances derrière un répartiteur de charge, une diffusion n'atteindrait que les clients de la même instance. Il faudrait l'adaptateur Redis de Socket.IO (`@socket.io/redis-adapter`) et des sessions persistantes (*sticky sessions*).
-- **Déconnexion dans un autre onglet.** `/logout` efface le cookie, mais un socket déjà ouvert dans un autre onglet garde son identité jusqu'à sa fermeture. Il ne peut plus jouer (les actions passent par HTTP), mais il reçoit encore les diffusions. Correction possible : fermer les sockets du salon `joueur:<id>` au `/logout`.
+- **Déconnexion dans un autre onglet.** `/logout` efface le cookie, mais un socket déjà ouvert dans un autre onglet garde son identité jusqu'à sa fermeture. Il ne peut plus jouer (les actions passent par HTTP), mais il reçoit encore les diffusions et peut encore écrire dans le clavardage. Correction possible : fermer les sockets du salon `joueur:<id>` au `/logout`.
+- **Limite de débit du clavardage en mémoire.** Elle est perdue au redémarrage (sans gravité) et ne serait pas partagée entre plusieurs instances du serveur.
+- **Historique limité.** Seuls les 50 derniers messages sont envoyés en arrivant ; les plus anciens restent en base mais ne sont pas affichés.
+- **Spectateurs et clavardage.** Le panneau est prêt pour les spectateurs (lecture, invitation à se connecter), mais ils ne peuvent ouvrir la page d'une partie qu'avec #55.
 - **Deux sources pour l'affichage.** La réponse HTTP et la diffusion mettent toutes deux la page à jour ; si elles arrivaient dans le désordre, un état plus ancien pourrait s'afficher brièvement.
