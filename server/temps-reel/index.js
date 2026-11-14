@@ -36,10 +36,29 @@ function brancherTempsReel(serveurHttp) {
       socket.emit('partie:etat', etatPartie(partie, socket.data.joueur?.id ?? null));
     });
 
+    socket.on('partie:coup', (message, repondre) => refuserAction(socket, message, repondre));
+    socket.on('partie:abandon', (message, repondre) => refuserAction(socket, message, repondre));
+
     socket.on('disconnect', (raison) => console.log('Déconnexion', socket.id, raison));
   });
 
   return io;
+}
+
+function refuserAction(socket, message, repondre) {
+  if (typeof repondre !== 'function') return;
+  const partieId = message?.partieId;
+  if (!Number.isInteger(partieId)) return repondre({ erreur: 'Identifiant invalide.' });
+
+  const partie = trouverPartieParId(partieId);
+  if (!partie) return repondre({ erreur: 'Partie introuvable.' });
+
+  const joueur = socket.data.joueur;
+  if (!joueur) return repondre({ erreur: 'Vous devez être connecté.' });
+  if (![partie.createur, partie.blanc, partie.noir].includes(joueur.id)) {
+    return repondre({ erreur: 'Vous ne participez pas à cette partie.' });
+  }
+  repondre({ erreur: 'Les coups et l\'abandon se font par HTTP.' });
 }
 
 module.exports = { brancherTempsReel };
