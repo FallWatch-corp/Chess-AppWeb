@@ -37,7 +37,6 @@ test('bob revient après une coupure et reçoit le coup joué pendant son absenc
   const id = partieEnCours();
 
   // 1. bob ouvre une connexion et rejoint la partie
-    // 1. bob ouvre une connexion et rejoint la partie
   const premier = connecterSocket(serveur.url, cookiePour(bob.id));
   t.after(() => premier.close());
   await rejoindre(premier, id);
