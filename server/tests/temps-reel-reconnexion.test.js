@@ -37,7 +37,9 @@ test('bob revient après une coupure et reçoit le coup joué pendant son absenc
   const id = partieEnCours();
 
   // 1. bob ouvre une connexion et rejoint la partie
+    // 1. bob ouvre une connexion et rejoint la partie
   const premier = connecterSocket(serveur.url, cookiePour(bob.id));
+  t.after(() => premier.close());
   await rejoindre(premier, id);
 
   // 2. bob perd sa connexion
@@ -45,10 +47,10 @@ test('bob revient après une coupure et reçoit le coup joué pendant son absenc
 
   // 3. pendant son absence, alice joue e2 → e4 par HTTP
   await request(serveur.url)
-  .post(`/api/parties/${id}/coups`)
-  .set('Cookie', cookiePour(alice.id))
-  .send({ de: 'e2', vers: 'e4' })
-  .expect(200);
+    .post(`/api/parties/${id}/coups`)
+    .set('Cookie', cookiePour(alice.id))
+    .send({ de: 'e2', vers: 'e4' })
+    .expect(200);
 
   // 4. bob revient : une NOUVELLE connexion, qui rejoint la partie
   const retour = connecterSocket(serveur.url, cookiePour(bob.id));
@@ -61,16 +63,22 @@ test('bob revient après une coupure et reçoit le coup joué pendant son absenc
   assert.equal(etat.couleur, 'noir');
 });
 
-test('une partie en cours survit à un redémarrage du serveur', { timeout: 5000 }, async (t) => {
+// Limite : le serveur est arrêté puis relancé dans le même programme Node.
+// Ce test prouve qu'un nouveau serveur retrouve la partie, pas qu'elle survit
+// à un vrai redémarrage du programme, où toute la mémoire est effacée.
+// À garder en dernier dans ce fichier : chaque demarrerServeur remplace le io
+// utilisé pour les diffusions, donc le serveur du before() n'en reçoit plus ensuite.
+test('un nouveau serveur retrouve la partie en cours après un arrêt', { timeout: 5000 }, async (t) => {
   const id = partieEnCours();
 
   // 1. un premier serveur démarre, et alice y joue e2 → e4 par HTTP
   const avant = await demarrerServeur(app);
+  t.after(() => avant.fermer());
   await request(avant.url)
-  .post(`/api/parties/${id}/coups`)
-  .set('Cookie', cookiePour(alice.id))
-  .send({ de: 'e2', vers: 'e4' })
-  .expect(200);
+    .post(`/api/parties/${id}/coups`)
+    .set('Cookie', cookiePour(alice.id))
+    .send({ de: 'e2', vers: 'e4' })
+    .expect(200);
 
   // 2. ce serveur s'arrête, puis un nouveau démarre
   await avant.fermer();
