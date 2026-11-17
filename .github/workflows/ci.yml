@@ -21,6 +21,17 @@ jobs:
       - name: Installer les dépendances
         run: npm install
 
+      - name: Vérifier le style (lint serveur et client)
+        run: npm run lint
+
+      # npm test ne couvre que le serveur : sans ces deux étapes, une erreur de type
+      # ou un client qui ne compile plus passerait la CI.
+      - name: Vérifier les types du client
+        run: npm run typecheck -w client
+
+      - name: Construire le client
+        run: npm run build -w client
+
       - name: Lancer les tests
         run: npm test
 
