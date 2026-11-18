@@ -279,6 +279,7 @@ Le même parcours vaut pour l'abandon et pour l'arrivée de l'adversaire dans la
 | --- | --- | --- | --- |
 | `partie:rejoindre` | client → serveur | l'id de la partie, et un accusé de réception | Entrer dans le salon `partie:<id>`. Réponse `{ ok: true }` ou `{ erreur }` |
 | `partie:etat` | serveur → client | l'état complet de la partie (le même objet que `GET /api/parties/:id`) | Envoyé à l'arrivée dans le salon, puis à chaque changement |
+| `partie:presence` | serveur → client | `{ blanc, noir }`, chacun `en_ligne` ou `hors_ligne` | Envoyé à tout le salon quand quelqu'un y entre ou se déconnecte |
 
 L'état est fabriqué à un seul endroit, `server/services/etat-partie.js`, utilisé à la fois par la route HTTP et par Socket.IO : les deux chemins envoient toujours le même format.
 
@@ -288,6 +289,13 @@ L'état est fabriqué à un seul endroit, `server/services/etat-partie.js`, util
 - `joueur:<id>` : toutes les connexions d'un joueur connecté (plusieurs onglets ou appareils). Prévu pour la présence et les notifications.
 
 Un socket perd ses salons à chaque déconnexion. Le client redemande donc `partie:rejoindre` à **chaque** événement `connect`, première connexion comme reconnexion, et le serveur lui renvoie l'état complet, coups manqués compris.
+
+### La présence (en ligne / hors ligne)
+
+- La présence se déduit des connexions ouvertes dans le salon `partie:<id>` (`server/temps-reel/presence.js`) : un joueur est `en_ligne` si au moins un socket du salon porte son identité (`socket.data.joueur`). Un spectateur ou un anonyme ne compte pour aucune couleur.
+- Elle est recalculée et envoyée à tout le salon quand un socket entre dans la partie (`partie:rejoindre`) et quand un socket se déconnecte. À la déconnexion, le socket a déjà quitté ses salons : on note donc ses parties dans l'événement `disconnecting`, puis on recalcule dans `disconnect`.
+- **Deuxième onglet : permis.** Un joueur peut ouvrir la même partie dans plusieurs onglets ou appareils. Fermer un onglet ne le met pas hors ligne tant qu'un autre reste ouvert, puisqu'on compte les joueurs et non les sockets. Les actions passent par HTTP et le serveur refuse un coup hors tour : deux onglets ne peuvent pas jouer deux fois.
+- Côté client, l'indicateur s'affiche à côté de l'adversaire. Si notre propre connexion tombe, l'indicateur disparaît jusqu'à la reconnexion, plutôt que d'afficher une information périmée.
 
 ### L'identité d'une connexion
 

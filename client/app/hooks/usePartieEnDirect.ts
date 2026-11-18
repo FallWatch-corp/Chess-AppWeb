@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 
+export type EtatPresence = "en_ligne" | "hors_ligne";
+export type Presence = { blanc: EtatPresence; noir: EtatPresence };
+
 // Garde l'état d'une partie à jour en direct grâce à Socket.IO.
 // partieInitiale vient du loader : c'est ce qui s'affiche au premier rendu (rendu serveur compris),
 // le socket ne fait ensuite que le remplacer par l'état envoyé par le serveur.
 export function usePartieEnDirect<T extends { id: number }>(urlApi: string, partieInitiale: T) {
   const [partie, setPartie] = useState(partieInitiale);
   const [connecte, setConnecte] = useState(false);
+  const [presence, setPresence] = useState<Presence | null>(null);
 
   // Quand le loader recharge (après une action), on reprend sa version.
   useEffect(() => setPartie(partieInitiale), [partieInitiale]);
@@ -27,8 +31,12 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
         if (reponse.erreur) console.error(reponse.erreur);
       });
     });
-    socket.on("disconnect", () => setConnecte(false));
+    socket.on("disconnect", () => {
+      setConnecte(false);
+      setPresence(null);
+    });
     socket.on("partie:etat", (etat: T) => setPartie(etat));
+    socket.on("partie:presence", (nouvelle: Presence) => setPresence(nouvelle));
 
     // Nettoyage : on ferme la connexion quand on quitte la page ou qu'on change de partie.
     // Sans lui, chaque visite laisserait un socket ouvert et le joueur paraîtrait encore présent.
@@ -38,5 +46,5 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
     // On dépend de l'id et pas de l'objet : sinon le socket serait recréé à chaque coup.
   }, [urlApi, partieInitiale.id]);
 
-  return { partie, connecte };
+  return { partie, connecte, presence };
 }

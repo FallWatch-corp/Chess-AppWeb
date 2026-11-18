@@ -197,8 +197,7 @@ test('un spectateur ne peut pas jouer par Socket.IO, même en se faisant passer 
 
 // Contrat attendu de #52 : le serveur émet partie:presence { blanc, noir }
 // avec 'en_ligne' ou 'hors_ligne' pour chaque couleur.
-// « todo » : le test tourne mais son échec ne casse pas npm test. On retire le todo avec #52.
-test('un joueur qui se déconnecte est annoncé hors ligne à son adversaire', { timeout: 5000, todo: 'la présence arrive avec #52' }, async (t) => {
+test('un joueur qui se déconnecte est annoncé hors ligne à son adversaire', { timeout: 5000 }, async (t) => {
   const id = partieEnCours();
   const socketAlice = connecterSocket(serveur.url, cookiePour(alice.id));
   const socketBob = connecterSocket(serveur.url, cookiePour(bob.id));
