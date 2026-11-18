@@ -8,7 +8,7 @@ import { useThemeEchiquier } from "../hooks/useThemeEchiquier";
 import { Echiquier } from "../echiquier/Echiquier";
 import { SelecteurTheme } from "../echiquier/SelecteurTheme";
 import { ORDRE, calculerMateriel, type Materiel, type TypePiece } from "../pieces-prises";
-import { usePartieEnDirect } from "../hooks/usePartieEnDirect";
+import { usePartieEnDirect, type Presence } from "../hooks/usePartieEnDirect";
 import type { loader as rootLoader } from "../root";
 
 type Couleur = "blanc" | "noir";
@@ -82,7 +82,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
   // L'adresse publique de l'API vient du loader racine (lue au démarrage, pas figée au build).
   const racine = useRouteLoaderData<typeof rootLoader>("root");
   // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie.
-  const { partie } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
+  const { partie, presence } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
 
   const revalidator = useRevalidator();
   const terminee = partie.statut === "terminee";
@@ -93,7 +93,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
   }, [terminee, revalidator]);
 
   if (partie.statut !== "en_attente") {
-    return <PartieEnCours partie={partie} />;
+    return <PartieEnCours partie={partie} presence={presence} />;
   }
 
   return (
@@ -111,7 +111,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
   );
 }
 
-function PartieEnCours({ partie }: { partie: Partie }) {
+function PartieEnCours({ partie, presence }: { partie: Partie; presence: Presence | null }) {
   const [theme, setTheme] = useThemeEchiquier();
   const fetcher = useFetcher<typeof action>();
   // comme sur l'échiquier : l'adversaire en haut, moi en bas
@@ -164,7 +164,13 @@ function PartieEnCours({ partie }: { partie: Partie }) {
       ) : (
         <p className="text-lg font-medium">{messageTrait}</p>
       )}
-      <BandeauJoueur joueur={partie[adversaire]} couleur={adversaire} trait={trait} materiel={materiel[adversaire]} />
+      <BandeauJoueur
+        joueur={partie[adversaire]}
+        couleur={adversaire}
+        trait={trait}
+        materiel={materiel[adversaire]}
+        enLigne={presence ? presence[adversaire] === "en_ligne" : undefined}
+      />
       <Echiquier
         fen={fen}
         couleur={partie.couleur}
@@ -230,11 +236,13 @@ function BandeauJoueur({
   couleur,
   trait,
   materiel,
+  enLigne,
 }: {
   joueur: JoueurPartie | null;
   couleur: Couleur;
   trait: Couleur | null;
   materiel: Materiel;
+  enLigne?: boolean;
 }) {
   return (
     <div className="flex w-full max-w-140 items-center justify-between">
@@ -249,6 +257,15 @@ function BandeauJoueur({
           <span className="sr-only">{couleur === "blanc" ? "Blancs :" : "Noirs :"}</span>
           <span className="font-semibold">{joueur?.nom ?? "?"}</span>
           <span className="font-mono text-gray-500">({joueur?.elo ?? "?"})</span>
+          {enLigne !== undefined && (
+            <span className="flex items-center gap-1 text-sm text-gray-500">
+              <span
+                aria-hidden
+                className={`inline-block size-2 rounded-full ${enLigne ? "bg-green-500" : "bg-gray-400"}`}
+              />
+              {enLigne ? "en ligne" : "hors ligne"}
+            </span>
+          )}
         </span>
         <PiecesPrises prises={materiel.prises} avantage={materiel.avantage} />
       </div>

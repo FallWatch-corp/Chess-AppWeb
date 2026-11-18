@@ -3,6 +3,7 @@ const { authentifierSocket } = require('./authentification.js');
 const { trouverPartieParId } = require('../repository/parties.js');
 const { etatPartie } = require('../services/etat-partie.js');
 const { enregistrerIo } = require('./diffusion.js');
+const { diffuserPresence } = require('./presence.js');
 
 function brancherTempsReel(serveurHttp) {
   // credentials: true pour que le navigateur envoie le cookie de session ;
@@ -34,9 +35,21 @@ function brancherTempsReel(serveurHttp) {
       repondre({ ok: true });
       // Seulement à ce socket : il arrive et a besoin de l'état complet.
       socket.emit('partie:etat', etatPartie(partie, socket.data.joueur?.id ?? null));
+      diffuserPresence(io, partieId).catch(console.error);
     });
 
-    socket.on('disconnect', (raison) => console.log('Déconnexion', socket.id, raison));
+    socket.on('disconnecting', () => {
+      socket.data.parties = [...socket.rooms]
+        .filter((salon) => salon.startsWith('partie:'))
+        .map((salon) => Number(salon.slice('partie:'.length)));
+    });
+
+    socket.on('disconnect', (raison) => {
+      console.log('Déconnexion', socket.id, raison);
+      for (const partieId of socket.data.parties ?? []) {
+        diffuserPresence(io, partieId).catch(console.error);
+      }
+    });
   });
 
   return io;
