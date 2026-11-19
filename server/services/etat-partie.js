@@ -5,14 +5,16 @@ const { trouverJoueurParId } = require('../repository/joueurs.js');
 // Utilisé par HTTP (GET /api/parties/:id) et par Socket.IO : les deux envoient le même objet.
 function etatPartie(partie, joueurId) {
   // couleur reste null tant que l'adversaire n'a pas rejoint, et pour un spectateur
+  // Le test joueurId !== null compte : en attente, noir vaut null, et un anonyme deviendrait « noir ».
   let couleur = null;
-  if (partie.blanc === joueurId) couleur = 'blanc';
-  if (partie.noir === joueurId) couleur = 'noir';
+  if (joueurId !== null && partie.blanc === joueurId) couleur = 'blanc';
+  if (joueurId !== null && partie.noir === joueurId) couleur = 'noir';
 
-  const { id, code, statut, fen } = partie;
+  const { id, statut, fen } = partie;
   return {
     id,
-    code,
+    // Seul le créateur voit le code : un spectateur qui l'aurait pourrait prendre la place de l'adversaire.
+    code: partie.createur === joueurId ? partie.code : null,
     statut,
     couleur,
     fen,
