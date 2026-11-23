@@ -45,6 +45,13 @@ test('chaque cadence a un id unique, et son id correspond à sa base et à son i
   }
 });
 
+test('GET /api/cadences donne la liste à tout le monde, même sans compte', async () => {
+  const reponse = await request(app).get('/api/cadences');
+
+  assert.equal(reponse.status, 200);
+  assert.deepEqual(reponse.body, CADENCES);
+});
+
 test('POST /api/parties enregistre la cadence choisie et la renvoie complète', async () => {
   const creation = await creer(alice, { cadence: '3+2' });
 
