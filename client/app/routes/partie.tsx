@@ -8,7 +8,7 @@ import { useThemeEchiquier } from "../hooks/useThemeEchiquier";
 import { Echiquier } from "../echiquier/Echiquier";
 import { SelecteurTheme } from "../echiquier/SelecteurTheme";
 import { ORDRE, calculerMateriel, type Materiel, type TypePiece } from "../pieces-prises";
-import { usePartieEnDirect } from "../hooks/usePartieEnDirect";
+import { usePartieEnDirect, type Presence } from "../hooks/usePartieEnDirect";
 import { Clavardage } from "../clavardage/Clavardage";
 import type { loader as rootLoader } from "../root";
 
@@ -85,7 +85,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
   const racine = useRouteLoaderData<typeof rootLoader>("root");
   // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie,
   // ainsi que les messages du clavardage (même socket, même salon).
-  const { partie, messages, envoyerMessage } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
+  const { partie, presence, messages, envoyerMessage } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
 
   const revalidator = useRevalidator();
   const terminee = partie.statut === "terminee";
@@ -108,7 +108,11 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
   );
 
   if (partie.statut !== "en_attente") {
-    return <PartieEnCours partie={partie}>{clavardage}</PartieEnCours>;
+    return (
+      <PartieEnCours partie={partie} presence={presence}>
+        {clavardage}
+      </PartieEnCours>
+    );
   }
 
   if (partie.code === null) {
@@ -138,7 +142,15 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
 }
 
 // children : le panneau de clavardage, affiché sous l'échiquier.
-function PartieEnCours({ partie, children }: { partie: Partie; children: ReactNode }) {
+function PartieEnCours({
+  partie,
+  presence,
+  children,
+}: {
+  partie: Partie;
+  presence: Presence | null;
+  children: ReactNode;
+}) {
   const [theme, setTheme] = useThemeEchiquier();
   const fetcher = useFetcher<typeof action>();
   // comme sur l'échiquier : l'adversaire en haut, moi en bas
@@ -192,14 +204,26 @@ function PartieEnCours({ partie, children }: { partie: Partie; children: ReactNo
         <p className="text-lg font-medium">{messageTrait}</p>
       )}
       {!partie.couleur && <p className="text-sm text-gray-500">Vous regardez cette partie en spectateur.</p>}
-      <BandeauJoueur joueur={partie[adversaire]} couleur={adversaire} trait={trait} materiel={materiel[adversaire]} />
+      <BandeauJoueur
+        joueur={partie[adversaire]}
+        couleur={adversaire}
+        trait={trait}
+        materiel={materiel[adversaire]}
+        enLigne={presence ? presence[adversaire] === "en_ligne" : undefined}
+      />
       <Echiquier
         fen={fen}
         couleur={partie.couleur}
         theme={theme}
         onCoup={peutJouer ? jouer : undefined}
       />
-            <BandeauJoueur joueur={partie[moi]} couleur={moi} trait={trait} materiel={materiel[moi]} />
+            <BandeauJoueur
+        joueur={partie[moi]}
+        couleur={moi}
+        trait={trait}
+        materiel={materiel[moi]}
+        enLigne={presence && !partie.couleur ? presence[moi] === "en_ligne" : undefined}
+      />
       {enCours && partie.couleur && (
         <button
           type="button"
@@ -261,11 +285,13 @@ function BandeauJoueur({
   couleur,
   trait,
   materiel,
+  enLigne,
 }: {
   joueur: JoueurPartie | null;
   couleur: Couleur;
   trait: Couleur | null;
   materiel: Materiel;
+  enLigne?: boolean;
 }) {
   return (
     <div className="flex w-full max-w-140 items-center justify-between">
@@ -280,6 +306,15 @@ function BandeauJoueur({
           <span className="sr-only">{couleur === "blanc" ? "Blancs :" : "Noirs :"}</span>
           <span className="font-semibold">{joueur?.nom ?? "?"}</span>
           <span className="font-mono text-gray-500">({joueur?.elo ?? "?"})</span>
+          {enLigne !== undefined && (
+            <span className="flex items-center gap-1 text-sm text-gray-500">
+              <span
+                aria-hidden
+                className={`inline-block size-2 rounded-full ${enLigne ? "bg-green-500" : "bg-gray-400"}`}
+              />
+              {enLigne ? "en ligne" : "hors ligne"}
+            </span>
+          )}
         </span>
         <PiecesPrises prises={materiel.prises} avantage={materiel.avantage} />
       </div>

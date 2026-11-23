@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
+export type EtatPresence = "en_ligne" | "hors_ligne";
+export type Presence = { blanc: EtatPresence; noir: EtatPresence };
+
 // Un message tel que le serveur l'envoie (server/services/clavardage.js, messagePublic).
 // role est calculé par le serveur : "joueur" = le créateur, tant que sa couleur n'est pas tirée.
 export type MessageClavardage = {
@@ -17,6 +20,7 @@ export type MessageClavardage = {
 export function usePartieEnDirect<T extends { id: number }>(urlApi: string, partieInitiale: T) {
   const [partie, setPartie] = useState(partieInitiale);
   const [connecte, setConnecte] = useState(false);
+  const [presence, setPresence] = useState<Presence | null>(null);
   // Vide au rendu serveur : l'historique n'arrive que par le socket, donc dans le navigateur.
   const [messages, setMessages] = useState<MessageClavardage[]>([]);
   // Le socket est créé dans l'effet, mais envoyerMessage (plus bas) en a besoin.
@@ -43,8 +47,12 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
         if (reponse.erreur) console.error(reponse.erreur);
       });
     });
-    socket.on("disconnect", () => setConnecte(false));
+    socket.on("disconnect", () => {
+      setConnecte(false);
+      setPresence(null);
+    });
     socket.on("partie:etat", (etat: T) => setPartie(etat));
+    socket.on("partie:presence", (nouvelle: Presence) => setPresence(nouvelle));
 
     // Tous les écouteurs sont posés ici, AVANT que la connexion aboutisse :
     // l'historique, envoyé juste après partie:rejoindre, ne peut donc pas arriver sans personne pour l'écouter.
@@ -85,5 +93,5 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
     [partieInitiale.id],
   );
 
-  return { partie, connecte, messages, envoyerMessage };
+  return { partie, connecte, presence, messages, envoyerMessage };
 }

@@ -5,6 +5,7 @@ const { etatPartie } = require('../services/etat-partie.js');
 const { envoyerMessage, historique } = require('../services/clavardage.js');
 const { ErreurApi } = require('../services/erreur-api.js');
 const { enregistrerIo } = require('./diffusion.js');
+const { diffuserPresence } = require('./presence.js');
 
 function brancherTempsReel(serveurHttp) {
   // credentials: true pour que le navigateur envoie le cookie de session ;
@@ -39,6 +40,7 @@ function brancherTempsReel(serveurHttp) {
 
       // L'historique arrive à chaque (re)connexion : rien de manqué pendant une coupure.
       socket.emit('clavardage:historique', historique(partie));
+      diffuserPresence(io, partieId).catch(console.error);
     });
 
     // Le message ne contient que partieId et texte : l'auteur vient toujours de socket.data.
@@ -67,7 +69,18 @@ function brancherTempsReel(serveurHttp) {
     socket.on('partie:coup', (message, repondre) => refuserAction(socket, message, repondre));
     socket.on('partie:abandon', (message, repondre) => refuserAction(socket, message, repondre));
 
-    socket.on('disconnect', (raison) => console.log('Déconnexion', socket.id, raison));
+    socket.on('disconnecting', () => {
+      socket.data.parties = [...socket.rooms]
+        .filter((salon) => salon.startsWith('partie:'))
+        .map((salon) => Number(salon.slice('partie:'.length)));
+    });
+
+    socket.on('disconnect', (raison) => {
+      console.log('Déconnexion', socket.id, raison);
+      for (const partieId of socket.data.parties ?? []) {
+        diffuserPresence(io, partieId).catch(console.error);
+      }
+    });
   });
 
   return io;
