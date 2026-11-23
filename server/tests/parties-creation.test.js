@@ -75,6 +75,7 @@ test('GET /api/parties/:id renvoie la partie à son créateur', async () => {
     noir: null,
     coups: [],
     fin: null,
+    echeance: null,
   });
 });
 

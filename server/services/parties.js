@@ -6,7 +6,7 @@ const {
   demarrerPartie,
 } = require('../repository/parties.js');
 const { ErreurApi } = require('./erreur-api.js');
-const { trouverCadence } = require('./cadences.js');
+const { trouverCadence, prochaineEcheance } = require('./cadences.js');
 const { trouverJoueurParId } = require('../repository/joueurs.js');
 
 // On a enlevé 0, O, 1, I et L parce qu'on les confond facilement.
@@ -66,7 +66,7 @@ function rejoindrePartie(joueurId, code, createurEstBlanc = pileOuFace) {
     : [joueurId, partie.createur];
 
   // Quelqu'un d'autre a pu rejoindre juste avant nous
-  if (!demarrerPartie({ id: partie.id, blancId, noirId })) {
+  if (!demarrerPartie({ id: partie.id, blancId, noirId, echeance: prochaineEcheance(partie.cadence) })) {
     throw new ErreurApi(409, 'Ce code a déjà été utilisé.');
   }
 

@@ -8,26 +8,26 @@ const insertPartie = db.prepare(`
 
 const selectParId = db.prepare(`
   SELECT id, code, createur, blanc, noir, fen, statut, cadence, resultat, cause,
-         elo_blanc_avant, elo_blanc_apres, elo_noir_avant, elo_noir_apres
+         elo_blanc_avant, elo_blanc_apres, elo_noir_avant, elo_noir_apres, echeance
   FROM parties WHERE id = ?
 `);
 
 const selectParCode = db.prepare(`
-  SELECT id, code, createur, blanc, noir, fen, statut, cadence
+  SELECT id, code, createur, blanc, noir, fen, statut, cadence, echeance
   FROM parties WHERE code = ?
 `);
 
 // Le WHERE statut = 'en_attente' est important : si deux joueurs rejoignent
 // en meme temps, seulement le premier va modifier la ligne.
 const updateDemarrer = db.prepare(`
-  UPDATE parties SET blanc = ?, noir = ?, statut = 'en_cours'
+  UPDATE parties SET blanc = ?, noir = ?, statut = 'en_cours', echeance = ?
   WHERE id = ? AND statut = 'en_attente'
 `);
 
 // Le WHERE fen = ? fait comme pour demarrer : si deux coups arrivent en meme temps
 // sur la meme position, seulement le premier modifie la ligne.
 const updateFen = db.prepare(`
-  UPDATE parties SET fen = ?
+  UPDATE parties SET fen = ?, echeance = ?
   WHERE id = ? AND fen = ? AND statut = 'en_cours'
 `);
 
@@ -78,16 +78,16 @@ function trouverPartieParCode(code) {
 }
 
 // Retourne false si la partie n'était plus en attente.
-function demarrerPartie({ id, blancId, noirId }) {
-  return updateDemarrer.run(blancId, noirId, id).changes === 1;
+function demarrerPartie({ id, blancId, noirId, echeance = null }) {
+  return updateDemarrer.run(blancId, noirId, echeance, id).changes === 1;
 }
 
 // La nouvelle FEN et le coup sont enregistrés ensemble ou pas du tout.
 // Retourne false si la position a changé entre-temps (rien n'est enregistré).
-function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup }) {
+function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup, echeance = null }) {
   db.exec('BEGIN');
   try {
-    if (updateFen.run(nouvelleFen, id, ancienneFen).changes !== 1) {
+    if (updateFen.run(nouvelleFen, echeance, id, ancienneFen).changes !== 1) {
       db.exec('ROLLBACK');
       return false;
     }

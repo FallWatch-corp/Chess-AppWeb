@@ -18,4 +18,14 @@ function trouverCadence(id) {
   return CADENCES.find((cadence) => cadence.id === id);
 }
 
-module.exports = { CADENCES, trouverCadence };
+// Date limite du prochain coup : dans 24 h pour une partie quotidienne, aucune sinon.
+// maintenant est un paramètre pour pouvoir le fixer dans les tests.
+function prochaineEcheance(cadenceId, maintenant = new Date()) {
+  const cadence = trouverCadence(cadenceId);
+  if (cadence.categorie === 'quotidien') {
+    return new Date(maintenant.getTime() + cadence.base * 1000).toISOString();
+  }
+  return null;
+}
+
+module.exports = { CADENCES, trouverCadence, prochaineEcheance };
