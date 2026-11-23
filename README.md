@@ -263,6 +263,8 @@ Comme la position et la liste des coups sont en base, une partie survit à un re
 
 Quand un joueur joue, son adversaire et les spectateurs voient le coup **aussitôt**, sans recharger la page : c'est le serveur qui prévient le navigateur, par une connexion Socket.IO.
 
+N'importe qui peut suivre une partie avec son lien, même sans compte : `GET /api/parties/:id` est public. Celui qui n'y joue pas la reçoit en spectateur (`couleur: null`), sans le code d'invitation, réservé au créateur. Il ne peut ni jouer ni abandonner : ces actions passent par HTTP et répondent `401` ou `403`.
+
 ### Le parcours d'un coup
 
 1. Alice dépose une pièce : le client envoie `POST /api/parties/:id/coups` (HTTP, comme au projet 1).
@@ -355,5 +357,4 @@ Joueurs et spectateurs discutent sous l'échiquier, en salle d'attente, pendant 
 - **Déconnexion dans un autre onglet.** `/logout` efface le cookie, mais un socket déjà ouvert dans un autre onglet garde son identité jusqu'à sa fermeture. Il ne peut plus jouer (les actions passent par HTTP), mais il reçoit encore les diffusions et peut encore écrire dans le clavardage. Correction possible : fermer les sockets du salon `joueur:<id>` au `/logout`.
 - **Limite de débit du clavardage en mémoire.** Elle est perdue au redémarrage (sans gravité) et ne serait pas partagée entre plusieurs instances du serveur. La `Map` qui la garde (`derniersMessages`) n'est jamais vidée : une entrée par joueur ayant écrit depuis le démarrage, ce qui reste négligeable à notre échelle.
 - **Historique limité.** Seuls les 50 derniers messages sont envoyés en arrivant ; les plus anciens restent en base mais ne sont pas affichés.
-- **Spectateurs et clavardage.** Le panneau est prêt pour les spectateurs (lecture, invitation à se connecter), mais ils ne peuvent ouvrir la page d'une partie qu'avec #55.
 - **Deux sources pour l'affichage.** La réponse HTTP et la diffusion mettent toutes deux la page à jour ; si elles arrivaient dans le désordre, un état plus ancien pourrait s'afficher brièvement.

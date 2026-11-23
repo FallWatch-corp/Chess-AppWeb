@@ -78,12 +78,25 @@ test('GET /api/parties/:id renvoie la partie à son créateur', async () => {
   });
 });
 
-test('GET /api/parties/:id répond 403 à un joueur qui ne participe pas', async () => {
+test('GET /api/parties/:id traite un joueur qui ne participe pas en spectateur, sans le code', async () => {
   const creation = await request(appConnectee(app, alice.id)).post('/api/parties');
 
   const reponse = await request(appConnectee(app, bob.id)).get(`/api/parties/${creation.body.id}`);
 
-  assert.equal(reponse.status, 403);
+  assert.equal(reponse.status, 200);
+  assert.equal(reponse.body.couleur, null);
+  assert.equal(reponse.body.code, null);
+});
+
+test('GET /api/parties/:id est ouvert sans compte, sans le code', async () => {
+  const creation = await request(appConnectee(app, alice.id)).post('/api/parties');
+
+  const reponse = await request(app).get(`/api/parties/${creation.body.id}`);
+
+  assert.equal(reponse.status, 200);
+  assert.equal(reponse.body.couleur, null);
+  assert.equal(reponse.body.code, null);
+  assert.equal(reponse.body.fen, DEFAULT_POSITION);
 });
 
 test('GET /api/parties/:id répond 404 pour une partie inexistante', async () => {

@@ -17,7 +17,8 @@ type JoueurPartie = { nom: string; elo: number };
 
 type Partie = {
   id: number;
-  code: string;
+  // null pour un spectateur : seul le créateur reçoit le code d'invitation
+  code: string | null;
   statut: string;
   couleur: Couleur | null;
   fen: string;
@@ -41,8 +42,8 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
+  // Lecture publique : sans compte, ou sans être dans la partie, on la reçoit en spectateur.
   const reponse = await appelerApi(request, `/api/parties/${params.id}`);
-  if (reponse.status === 401) throw redirect("/");
   if (!reponse.ok) {
     const { erreur } = await reponse.json();
     throw new Response(erreur, { status: reponse.status });
@@ -108,6 +109,16 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
 
   if (partie.statut !== "en_attente") {
     return <PartieEnCours partie={partie}>{clavardage}</PartieEnCours>;
+  }
+
+  if (partie.code === null) {
+    return (
+      <main className="container mx-auto flex flex-col items-center gap-6 p-8">
+        <h1 className="text-2xl font-semibold">Partie privée</h1>
+        <p className="text-gray-500">Vous êtes spectateur. La partie n'a pas encore commencé…</p>
+        {clavardage}
+      </main>
+    );
   }
 
   return (
@@ -180,6 +191,7 @@ function PartieEnCours({ partie, children }: { partie: Partie; children: ReactNo
       ) : (
         <p className="text-lg font-medium">{messageTrait}</p>
       )}
+      {!partie.couleur && <p className="text-sm text-gray-500">Vous regardez cette partie en spectateur.</p>}
       <BandeauJoueur joueur={partie[adversaire]} couleur={adversaire} trait={trait} materiel={materiel[adversaire]} />
       <Echiquier
         fen={fen}
@@ -209,11 +221,13 @@ function PartieEnCours({ partie, children }: { partie: Partie; children: ReactNo
   );
 }
 
-// Le résultat est donné du point de vue du joueur qui regarde la page.
+// Le résultat est donné du point de vue du joueur qui regarde la page
+// (un spectateur, sans couleur, voit simplement quel camp a gagné).
 function ResultatPartie({ partie, fin }: { partie: Partie; fin: Fin }) {
   let titre = "Nulle";
   if (fin.resultat !== "nulle") {
-    titre = fin.resultat === partie.couleur ? "Victoire" : "Défaite";
+    if (!partie.couleur) titre = fin.resultat === "blanc" ? "Victoire des blancs" : "Victoire des noirs";
+    else titre = fin.resultat === partie.couleur ? "Victoire" : "Défaite";
   }
   const lignes = [
     { couleur: "Blancs", joueur: partie.blanc, elo: fin.eloBlanc },
