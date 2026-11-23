@@ -48,7 +48,7 @@ const updateTerminer = db.prepare(`
 const selectTerminees = db.prepare(`
   SELECT p.id, p.blanc, p.noir, p.resultat, p.cause, p.terminee_le,
          p.elo_blanc_avant, p.elo_blanc_apres, p.elo_noir_avant, p.elo_noir_apres,
-         jb.nom AS nom_blanc, jn.nom AS nom_noir
+         jb.nom AS nom_blanc, jn.nom AS nom_noir, p.cadence
   FROM parties p
   JOIN joueurs jb ON jb.id = p.blanc
   JOIN joueurs jn ON jn.id = p.noir

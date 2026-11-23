@@ -1,11 +1,12 @@
 const express = require('express');
 const { exigerConnexion } = require('../middlewares/exiger-connexion.js');
-const { creerPartie, rejoindrePartie } = require('../services/parties.js');
+const { creerPartie, rejoindrePartie, apercuPartie } = require('../services/parties.js');
 const { jouerCoup } = require('../services/coups.js');
 const { abandonner } = require('../services/fin-partie.js');
 const { etatPartie } = require('../services/etat-partie.js');
 const { trouverPartieParId, listerPartiesTerminees } = require('../repository/parties.js');
 const { diffuserPartie } = require('../temps-reel/diffusion.js');
+const { trouverCadence } = require('../services/cadences.js');
 
 const router = express.Router();
 
@@ -46,9 +47,16 @@ router.get('/', (req, res) => {
       eloAvant: jeSuisBlanc ? partie.elo_blanc_avant : partie.elo_noir_avant,
       eloApres: jeSuisBlanc ? partie.elo_blanc_apres : partie.elo_noir_apres,
       date: partie.terminee_le,
+      cadence: trouverCadence(partie.cadence),
     };
   });
   res.json(historique);
+});
+
+router.get('/code/:code', (req, res) => {
+  const code = req.params.code;
+  const partie = apercuPartie(code);
+  res.json(partie);
 });
 
 // Le coup est validé par chess.js dans le service ; on renvoie la partie à jour,

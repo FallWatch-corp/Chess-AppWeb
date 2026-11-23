@@ -7,6 +7,7 @@ const {
 } = require('../repository/parties.js');
 const { ErreurApi } = require('./erreur-api.js');
 const { trouverCadence } = require('./cadences.js');
+const { trouverJoueurParId } = require('../repository/joueurs.js');
 
 // On a enlevé 0, O, 1, I et L parce qu'on les confond facilement.
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -72,4 +73,15 @@ function rejoindrePartie(joueurId, code, createurEstBlanc = pileOuFace) {
   return { id: partie.id, couleur: joueurId === blancId ? 'blanc' : 'noir' };
 }
 
-module.exports = { creerPartie, rejoindrePartie, genererCode, ALPHABET, LONGUEUR_CODE };
+function apercuPartie(code) {
+  const partie = trouverPartieParCode(String(code ?? '').trim().toUpperCase());
+  if (!partie) {
+    throw new ErreurApi(404, 'Aucune partie ne correspond à ce code.');
+  }
+  if (partie.statut !== 'en_attente') {
+    throw new ErreurApi(409, 'Ce code a déjà été utilisé.');
+  }
+  return { createur: trouverJoueurParId(partie.createur).nom, cadence: trouverCadence(partie.cadence) };
+};  
+
+module.exports = {  creerPartie, rejoindrePartie, genererCode, ALPHABET, LONGUEUR_CODE, apercuPartie };
