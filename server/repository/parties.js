@@ -2,18 +2,18 @@ const db = require('./db.js');
 const { mettreAJourElo } = require('./joueurs.js');
 
 const insertPartie = db.prepare(`
-  INSERT INTO parties (code, createur, fen) VALUES (?, ?, ?)
-  RETURNING id, code, statut
+  INSERT INTO parties (code, createur, fen, cadence) VALUES (?, ?, ?, ?)
+  RETURNING id, code, statut, cadence
 `);
 
 const selectParId = db.prepare(`
-  SELECT id, code, createur, blanc, noir, fen, statut, resultat, cause,
+  SELECT id, code, createur, blanc, noir, fen, statut, cadence, resultat, cause,
          elo_blanc_avant, elo_blanc_apres, elo_noir_avant, elo_noir_apres
   FROM parties WHERE id = ?
 `);
 
 const selectParCode = db.prepare(`
-  SELECT id, code, createur, blanc, noir, fen, statut
+  SELECT id, code, createur, blanc, noir, fen, statut, cadence
   FROM parties WHERE code = ?
 `);
 
@@ -65,8 +65,8 @@ const insertCoup = db.prepare(`
 const selectCoups = db.prepare('SELECT coup FROM coups WHERE partie = ? ORDER BY ordre');
 
 // Attention : ça plante (erreur 2067) si le code est deja utilisé.
-function insererPartie({ code, createurId, fen }) {
-  return insertPartie.get(code, createurId, fen);
+function insererPartie({ code, createurId, fen, cadence }) {
+  return insertPartie.get(code, createurId, fen, cadence);
 }
 
 function trouverPartieParId(id) {

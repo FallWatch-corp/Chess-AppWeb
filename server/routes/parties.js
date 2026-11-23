@@ -16,7 +16,7 @@ router.get('/:id', envoyerPartie);
 router.use(exigerConnexion);
 
 router.post('/', (req, res) => {
-  const partie = creerPartie(req.joueur.id);
+  const partie = creerPartie(req.joueur.id, req.body?.cadence);
   res.status(201).json(partie);
 });
 

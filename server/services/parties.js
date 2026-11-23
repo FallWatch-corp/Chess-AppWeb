@@ -6,6 +6,7 @@ const {
   demarrerPartie,
 } = require('../repository/parties.js');
 const { ErreurApi } = require('./erreur-api.js');
+const { trouverCadence } = require('./cadences.js');
 
 // On a enlevé 0, O, 1, I et L parce qu'on les confond facilement.
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -23,10 +24,16 @@ function genererCode() {
 
 // Le code est UNIQUE dans la base. Si jamais on tombe sur un code deja pris
 // (ça devrait presque jamais arriver), on en genere un autre.
-function creerPartie(createurId, generer = genererCode) {
+// La cadence est un id de la liste (services/cadences.js) ; un id inconnu est refusé.
+function creerPartie(createurId, cadence = '10+0', generer = genererCode) {
+  if (!trouverCadence(cadence)) {
+    throw new ErreurApi(400, 'Cadence inconnue.');
+  }
   for (let tentative = 1; ; tentative++) {
     try {
-      return insererPartie({ code: generer(), createurId, fen: DEFAULT_POSITION });
+      const partie = insererPartie({ code: generer(), createurId, fen: DEFAULT_POSITION, cadence });
+      // En base, seulement l'id ; on renvoie l'objet complet, comme etatPartie.
+      return { ...partie, cadence: trouverCadence(partie.cadence) };
     } catch (erreur) {
       if (erreur.errcode !== SQLITE_CONSTRAINT_UNIQUE || tentative >= TENTATIVES_MAX) {
         throw erreur;
