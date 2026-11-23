@@ -9,6 +9,10 @@ const { diffuserPartie } = require('../temps-reel/diffusion.js');
 
 const router = express.Router();
 
+// Public : n'importe qui (même sans compte) peut suivre une partie avec son lien.
+// Pas d'exigerConnexion : un non-joueur ou un anonyme la reçoit en spectateur.
+router.get('/:id', envoyerPartie);
+
 router.use(exigerConnexion);
 
 router.post('/', (req, res) => {
@@ -47,9 +51,6 @@ router.get('/', (req, res) => {
   res.json(historique);
 });
 
-// Sert à afficher le code en attendant l'adversaire, puis l'échiquier (fen).
-router.get('/:id', envoyerPartie);
-
 // Le coup est validé par chess.js dans le service ; on renvoie la partie à jour,
 // puis on la diffuse au salon (adversaire et spectateurs) sans faire attendre la réponse.
 router.post('/:id/coups', (req, res) => {
@@ -72,12 +73,8 @@ function envoyerPartie(req, res) {
   if (!partie) {
     return res.status(404).json({ erreur: 'Partie introuvable.' });
   }
-
-  const participants = [partie.createur, partie.blanc, partie.noir];
-  if (!participants.includes(req.joueur.id)) {
-    return res.status(403).json({ erreur: 'Vous ne participez pas à cette partie.' });
-  }
-  res.json(etatPartie(partie, req.joueur.id));
+  // Lue dans la session (et pas req.joueur) : la route GET est publique.
+  res.json(etatPartie(partie, req.session?.joueurId ?? null));
 }
 
 module.exports = router;

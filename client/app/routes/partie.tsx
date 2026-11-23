@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { redirect, useFetcher, useRevalidator, useRouteLoaderData } from "react-router";
 import { Chess } from "chess.js";
 import type { Route } from "./+types/partie";
@@ -9,6 +9,7 @@ import { Echiquier } from "../echiquier/Echiquier";
 import { SelecteurTheme } from "../echiquier/SelecteurTheme";
 import { ORDRE, calculerMateriel, type Materiel, type TypePiece } from "../pieces-prises";
 import { usePartieEnDirect, type Presence } from "../hooks/usePartieEnDirect";
+import { Clavardage } from "../clavardage/Clavardage";
 import type { loader as rootLoader } from "../root";
 
 type Couleur = "blanc" | "noir";
@@ -16,7 +17,8 @@ type JoueurPartie = { nom: string; elo: number };
 
 type Partie = {
   id: number;
-  code: string;
+  // null pour un spectateur : seul le créateur reçoit le code d'invitation
+  code: string | null;
   statut: string;
   couleur: Couleur | null;
   fen: string;
@@ -40,8 +42,8 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
+  // Lecture publique : sans compte, ou sans être dans la partie, on la reçoit en spectateur.
   const reponse = await appelerApi(request, `/api/parties/${params.id}`);
-  if (reponse.status === 401) throw redirect("/");
   if (!reponse.ok) {
     const { erreur } = await reponse.json();
     throw new Response(erreur, { status: reponse.status });
@@ -81,8 +83,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 export default function PagePartie({ loaderData }: Route.ComponentProps) {
   // L'adresse publique de l'API vient du loader racine (lue au démarrage, pas figée au build).
   const racine = useRouteLoaderData<typeof rootLoader>("root");
-  // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie.
-  const { partie, presence } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
+  // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie,
+  // ainsi que les messages du clavardage (même socket, même salon).
+  const { partie, presence, messages, envoyerMessage } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
 
   const revalidator = useRevalidator();
   const terminee = partie.statut === "terminee";
@@ -92,8 +95,34 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
     etaitTerminee.current = terminee;
   }, [terminee, revalidator]);
 
+  // Construit une seule fois, affiché en salle d'attente comme pendant et après la partie.
+  // estConnecte vient de la session (loader racine) : un anonyme lit, mais est invité à se connecter.
+  const clavardage = (
+    <Clavardage
+      messages={messages}
+      estConnecte={Boolean(racine!.joueur)}
+      ferme={terminee}
+      urlConnexion={racine!.urlConnexion}
+      envoyer={envoyerMessage}
+    />
+  );
+
   if (partie.statut !== "en_attente") {
-    return <PartieEnCours partie={partie} presence={presence} />;
+    return (
+      <PartieEnCours partie={partie} presence={presence}>
+        {clavardage}
+      </PartieEnCours>
+    );
+  }
+
+  if (partie.code === null) {
+    return (
+      <main className="container mx-auto flex flex-col items-center gap-6 p-8">
+        <h1 className="text-2xl font-semibold">Partie privée</h1>
+        <p className="text-gray-500">Vous êtes spectateur. La partie n'a pas encore commencé…</p>
+        {clavardage}
+      </main>
+    );
   }
 
   return (
@@ -107,11 +136,21 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
         <BoutonCopier texte={partie.code} />
       </div>
       <p className="text-gray-500">En attente de votre adversaire…</p>
+      {clavardage}
     </main>
   );
 }
 
-function PartieEnCours({ partie, presence }: { partie: Partie; presence: Presence | null }) {
+// children : le panneau de clavardage, affiché sous l'échiquier.
+function PartieEnCours({
+  partie,
+  presence,
+  children,
+}: {
+  partie: Partie;
+  presence: Presence | null;
+  children: ReactNode;
+}) {
   const [theme, setTheme] = useThemeEchiquier();
   const fetcher = useFetcher<typeof action>();
   // comme sur l'échiquier : l'adversaire en haut, moi en bas
@@ -164,6 +203,7 @@ function PartieEnCours({ partie, presence }: { partie: Partie; presence: Presenc
       ) : (
         <p className="text-lg font-medium">{messageTrait}</p>
       )}
+      {!partie.couleur && <p className="text-sm text-gray-500">Vous regardez cette partie en spectateur.</p>}
       <BandeauJoueur
         joueur={partie[adversaire]}
         couleur={adversaire}
@@ -177,7 +217,13 @@ function PartieEnCours({ partie, presence }: { partie: Partie; presence: Presenc
         theme={theme}
         onCoup={peutJouer ? jouer : undefined}
       />
-            <BandeauJoueur joueur={partie[moi]} couleur={moi} trait={trait} materiel={materiel[moi]} />
+            <BandeauJoueur
+        joueur={partie[moi]}
+        couleur={moi}
+        trait={trait}
+        materiel={materiel[moi]}
+        enLigne={presence && !partie.couleur ? presence[moi] === "en_ligne" : undefined}
+      />
       {enCours && partie.couleur && (
         <button
           type="button"
@@ -194,15 +240,18 @@ function PartieEnCours({ partie, presence }: { partie: Partie; presence: Presenc
         </p>
       )}
       <SelecteurTheme theme={theme} onChange={setTheme} />
+      {children}
     </main>
   );
 }
 
-// Le résultat est donné du point de vue du joueur qui regarde la page.
+// Le résultat est donné du point de vue du joueur qui regarde la page
+// (un spectateur, sans couleur, voit simplement quel camp a gagné).
 function ResultatPartie({ partie, fin }: { partie: Partie; fin: Fin }) {
   let titre = "Nulle";
   if (fin.resultat !== "nulle") {
-    titre = fin.resultat === partie.couleur ? "Victoire" : "Défaite";
+    if (!partie.couleur) titre = fin.resultat === "blanc" ? "Victoire des blancs" : "Victoire des noirs";
+    else titre = fin.resultat === partie.couleur ? "Victoire" : "Défaite";
   }
   const lignes = [
     { couleur: "Blancs", joueur: partie.blanc, elo: fin.eloBlanc },
