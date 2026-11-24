@@ -310,6 +310,8 @@ Un joueur qui se déconnecte en pleine partie a 60 secondes pour revenir. Sinon,
 - **À l'expiration**, le serveur appelle le même service qu'un abandon ordinaire (`abandonner` dans `server/services/fin-partie.js`) : même vérification, même calcul des deux Elo, même mise à jour conditionnelle en base. Puis il diffuse la partie terminée au salon.
 - **Les deux joueurs déconnectés** : chacun a sa minuterie. La première qui expire termine la partie ; la seconde est annulée, et un éventuel abandon tardif serait de toute façon refusé, car la partie n'est plus en cours.
 - **Seulement en partie en cours** : pas de délai en salle d'attente ni après la fin.
+- **Le créateur absent quand l'adversaire arrive** : s'il a fermé son onglet en salle d'attente, son délai de 60 secondes commence dès que l'adversaire rejoint, puisque la partie est alors en cours. C'est voulu : sans ce délai, la partie resterait bloquée indéfiniment.
+- **Calculer la présence démarre et annule les minuteries.** `presencePartie` (`server/temps-reel/presence.js`) ne se contente pas de lire les connexions : elle appelle `synchroniserDelais`. Un délai déjà commencé n'est jamais relancé : un spectateur qui arrive, ou un nouveau calcul, ne remet pas les 60 secondes à zéro.
 - **Le navigateur ne fait qu'afficher.** Le serveur envoie le temps restant en millisecondes (et pas une heure), ce qui évite les écarts entre l'horloge du serveur et celle du navigateur. Le client en déduit une échéance locale et affiche le compte à rebours à côté du joueur déconnecté. Il ne termine jamais la partie lui-même : la fin arrive par `partie:etat`.
 - La variable `DELAI_RETOUR_MS` (optionnelle, 60000 par défaut) change la durée. Les tests la mettent à 300 ms.
 
