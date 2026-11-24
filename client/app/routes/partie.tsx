@@ -85,7 +85,8 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
   const racine = useRouteLoaderData<typeof rootLoader>("root");
   // L'état affiché est mis à jour en direct : coups de l'adversaire, arrivée, fin de partie,
   // ainsi que les messages du clavardage (même socket, même salon).
-  const { partie, presence, messages, envoyerMessage } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
+  const { partie, presence, messages, envoyerMessage, connecte, dejaConnecte } = usePartieEnDirect(racine!.urlApi, loaderData.partie);
+  const connexionPerdue = dejaConnecte && !connecte;
 
   const revalidator = useRevalidator();
   const terminee = partie.statut === "terminee";
@@ -109,7 +110,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
 
   if (partie.statut !== "en_attente") {
     return (
-      <PartieEnCours partie={partie} presence={presence}>
+      <PartieEnCours partie={partie} presence={presence} connexionPerdue={connexionPerdue}>
         {clavardage}
       </PartieEnCours>
     );
@@ -146,10 +147,12 @@ function PartieEnCours({
   partie,
   presence,
   children,
+  connexionPerdue,
 }: {
   partie: Partie;
   presence: Presence | null;
   children: ReactNode;
+  connexionPerdue: boolean;
 }) {
   const [theme, setTheme] = useThemeEchiquier();
   const fetcher = useFetcher<typeof action>();
@@ -198,6 +201,9 @@ function PartieEnCours({
 
   return (
     <main className="container mx-auto flex flex-col items-center gap-4 p-8">
+      <div role="status" className="text-amber-700 empty:hidden">
+        {connexionPerdue && "Connexion perdue, reconnexion…"}
+      </div>
       {partie.fin ? (
         <ResultatPartie partie={partie} fin={partie.fin} />
       ) : (
