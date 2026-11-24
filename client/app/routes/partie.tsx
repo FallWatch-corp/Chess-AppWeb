@@ -201,7 +201,7 @@ function PartieEnCours({
 
   return (
     <main className="container mx-auto flex flex-col items-center gap-4 p-8">
-      <div role="status" className="text-amber-700 empty:hidden">
+      <div role="status" className="text-amber-700 dark:text-amber-400 empty:hidden">
         {connexionPerdue && "Connexion perdue, reconnexion…"}
       </div>
       {partie.fin ? (
