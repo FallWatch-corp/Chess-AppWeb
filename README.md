@@ -312,6 +312,8 @@ Un joueur qui se déconnecte en pleine partie a 60 secondes pour revenir. Sinon,
 - **Seulement en partie en cours** : pas de délai en salle d'attente ni après la fin.
 - **Le navigateur ne fait qu'afficher.** Le serveur envoie le temps restant en millisecondes (et pas une heure), ce qui évite les écarts entre l'horloge du serveur et celle du navigateur. Le client en déduit une échéance locale et affiche le compte à rebours à côté du joueur déconnecté. Il ne termine jamais la partie lui-même : la fin arrive par `partie:etat`.
 - La variable `DELAI_RETOUR_MS` (optionnelle, 60000 par défaut) change la durée. Les tests la mettent à 300 ms.
+- **Le délai survit à un redémarrage du serveur.** L'échéance (heure de fin, en millisecondes) est enregistrée dans la table `delais_retour` quand le délai commence, et effacée quand il est annulé ou qu'il expire. Au démarrage, `brancherTempsReel` appelle `reprendreDelais` : chaque délai d'une partie encore en cours reprend avec le temps qu'il lui restait, et un délai déjà dépassé pendant l'arrêt termine la partie par abandon tout de suite. Si les deux délais sont dépassés, celui qui finissait le plus tôt l'emporte. Un joueur qui revient après le redémarrage, dans le délai, continue la partie.
+- Ce redémarrage est testé pour de vrai (`server/tests/delai-retour-redemarrage.test.js`) : le test lance `server.js` dans un processus séparé, le tue, puis le relance sur la même base.
 
 ### L'identité d'une connexion
 
@@ -372,7 +374,7 @@ Joueurs et spectateurs discutent sous l'échiquier, en salle d'attente, pendant 
 
 ### Limites connues
 
-- **Délai de retour en mémoire.** Les minuteries de 60 secondes sont perdues si le serveur redémarre : un joueur déconnecté à ce moment-là n'aura plus de délai jusqu'au prochain calcul de la présence. L'enregistrement de l'échéance en base est prévu avec #60.
+- **Délai après un redémarrage.** Seuls les délais déjà commencés sont repris. Les joueurs encore en ligne au moment de l'arrêt n'ont pas de délai : il commence quand quelqu'un revient dans la partie et que la présence est recalculée.
 - **Une seule instance du serveur.** Les salons vivent en mémoire, dans le processus Node. Avec deux instances derrière un répartiteur de charge, une diffusion n'atteindrait que les clients de la même instance. Il faudrait l'adaptateur Redis de Socket.IO (`@socket.io/redis-adapter`) et des sessions persistantes (*sticky sessions*).
 - **Déconnexion dans un autre onglet.** `/logout` efface le cookie, mais un socket déjà ouvert dans un autre onglet garde son identité jusqu'à sa fermeture. Il ne peut plus jouer (les actions passent par HTTP), mais il reçoit encore les diffusions et peut encore écrire dans le clavardage. Correction possible : fermer les sockets du salon `joueur:<id>` au `/logout`.
 - **Limite de débit du clavardage en mémoire.** Elle est perdue au redémarrage (sans gravité) et ne serait pas partagée entre plusieurs instances du serveur. La `Map` qui la garde (`derniersMessages`) n'est jamais vidée : une entrée par joueur ayant écrit depuis le démarrage, ce qui reste négligeable à notre échelle.

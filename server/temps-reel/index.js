@@ -4,8 +4,9 @@ const { trouverPartieParId } = require('../repository/parties.js');
 const { etatPartie } = require('../services/etat-partie.js');
 const { envoyerMessage, historique } = require('../services/clavardage.js');
 const { ErreurApi } = require('../services/erreur-api.js');
-const { enregistrerIo } = require('./diffusion.js');
+const { enregistrerIo, diffuserPartie } = require('./diffusion.js');
 const { diffuserPresence } = require('./presence.js');
+const { reprendreDelais } = require('./delai-retour.js');
 
 function brancherTempsReel(serveurHttp) {
   // credentials: true pour que le navigateur envoie le cookie de session ;
@@ -15,6 +16,7 @@ function brancherTempsReel(serveurHttp) {
   });
   // diffusion.js garde io pour que les routes HTTP puissent prévenir les salons.
   enregistrerIo(io);
+  reprendreDelais((partieId) => diffuserPartie(partieId).catch(console.error));
 
   io.use(authentifierSocket);
 
