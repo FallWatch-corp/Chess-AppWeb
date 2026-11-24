@@ -93,6 +93,23 @@ test('un joueur qui revient à temps continue la partie', { timeout: 5000 }, asy
   assert.equal(partieEnBase(id).statut, 'en_cours');
 });
 
+test('un spectateur qui arrive ne relance pas le délai', { timeout: 5000 }, async (t) => {
+  const { id, blanc, noir } = nouvellePartie();
+  const socketBlanc = await entrer(t, id, blanc);
+  const socketNoir = await entrer(t, id, noir);
+
+  const depart = attendreQue(socketBlanc, 'partie:presence', (p) => p.noir === 'hors_ligne');
+  socketNoir.close();
+  const avant = (await depart).retour.noir;
+  await pause(100);
+
+  const arrivee = attendreQue(socketBlanc, 'partie:presence', () => true);
+  await entrer(t, id, nouveauJoueur());
+  const apres = (await arrivee).retour.noir;
+
+  assert.ok(apres <= avant - 80, `le délai est reparti de ${apres} ms au lieu de continuer depuis ${avant} ms`);
+});
+
 test('si les deux joueurs sont déconnectés, le premier dont le délai expire perd', { timeout: 5000 }, async (t) => {
   const { id, blanc, noir } = nouvellePartie();
   const spectateur = await entrer(t, id, null);
