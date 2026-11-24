@@ -281,7 +281,7 @@ Le même parcours vaut pour l'abandon et pour l'arrivée de l'adversaire dans la
 | --- | --- | --- | --- |
 | `partie:rejoindre` | client → serveur | l'id de la partie, et un accusé de réception | Entrer dans le salon `partie:<id>`. Réponse `{ ok: true }` ou `{ erreur }` |
 | `partie:etat` | serveur → client | l'état complet de la partie (le même objet que `GET /api/parties/:id`) | Envoyé à l'arrivée dans le salon, puis à chaque changement |
-| `partie:presence` | serveur → client | `{ blanc, noir }`, chacun `en_ligne` ou `hors_ligne` | Envoyé à tout le salon quand quelqu'un y entre ou se déconnecte |
+| `partie:presence` | serveur → client | `{ blanc, noir, retour }` : chaque couleur `en_ligne` ou `hors_ligne`, et dans `retour` les millisecondes qu'il reste à un joueur déconnecté pour revenir (`null` sans délai) | Envoyé à tout le salon quand quelqu'un y entre ou se déconnecte |
 | `partie:coup`, `partie:abandon` | client → serveur | `{ partieId }`, et un accusé de réception | Toujours refusés, la partie n'est jamais modifiée. Réponse selon `socket.data` : « Vous devez être connecté. », « Vous ne participez pas à cette partie. » ou, pour un joueur, « Les coups et l'abandon se font par HTTP. » |
 
 L'état est fabriqué à un seul endroit, `server/services/etat-partie.js`, utilisé à la fois par la route HTTP et par Socket.IO : les deux chemins envoient toujours le même format.
@@ -301,6 +301,17 @@ Un socket perd ses salons à chaque déconnexion. Le client redemande donc `part
 - Elle est recalculée et envoyée à tout le salon quand un socket entre dans la partie (`partie:rejoindre`) et quand un socket se déconnecte. À la déconnexion, le socket a déjà quitté ses salons : on note donc ses parties dans l'événement `disconnecting`, puis on recalcule dans `disconnect`.
 - **Deuxième onglet : permis.** Un joueur peut ouvrir la même partie dans plusieurs onglets ou appareils. Fermer un onglet ne le met pas hors ligne tant qu'un autre reste ouvert, puisqu'on compte les joueurs et non les sockets. Les actions passent par HTTP et le serveur refuse un coup hors tour : deux onglets ne peuvent pas jouer deux fois.
 - Côté client, l'indicateur s'affiche à côté de l'adversaire ; un spectateur le voit à côté des deux joueurs. Si notre propre connexion tombe, l'indicateur disparaît jusqu'à la reconnexion, plutôt que d'afficher une information périmée.
+
+### Le délai de retour (60 secondes)
+
+Un joueur qui se déconnecte en pleine partie a 60 secondes pour revenir. Sinon, il perd par abandon.
+
+- **C'est le serveur qui décide** (`server/temps-reel/delai-retour.js`). À chaque calcul de la présence, un joueur `hors_ligne` dans une partie `en_cours` reçoit une minuterie `setTimeout` de 60 secondes, et un joueur revenu `en_ligne` voit la sienne annulée.
+- **À l'expiration**, le serveur appelle le même service qu'un abandon ordinaire (`abandonner` dans `server/services/fin-partie.js`) : même vérification, même calcul des deux Elo, même mise à jour conditionnelle en base. Puis il diffuse la partie terminée au salon.
+- **Les deux joueurs déconnectés** : chacun a sa minuterie. La première qui expire termine la partie ; la seconde est annulée, et un éventuel abandon tardif serait de toute façon refusé, car la partie n'est plus en cours.
+- **Seulement en partie en cours** : pas de délai en salle d'attente ni après la fin.
+- **Le navigateur ne fait qu'afficher.** Le serveur envoie le temps restant en millisecondes (et pas une heure), ce qui évite les écarts entre l'horloge du serveur et celle du navigateur. Le client en déduit une échéance locale et affiche le compte à rebours à côté du joueur déconnecté. Il ne termine jamais la partie lui-même : la fin arrive par `partie:etat`.
+- La variable `DELAI_RETOUR_MS` (optionnelle, 60000 par défaut) change la durée. Les tests la mettent à 300 ms.
 
 ### L'identité d'une connexion
 
@@ -361,6 +372,7 @@ Joueurs et spectateurs discutent sous l'échiquier, en salle d'attente, pendant 
 
 ### Limites connues
 
+- **Délai de retour en mémoire.** Les minuteries de 60 secondes sont perdues si le serveur redémarre : un joueur déconnecté à ce moment-là n'aura plus de délai jusqu'au prochain calcul de la présence. L'enregistrement de l'échéance en base est prévu avec #60.
 - **Une seule instance du serveur.** Les salons vivent en mémoire, dans le processus Node. Avec deux instances derrière un répartiteur de charge, une diffusion n'atteindrait que les clients de la même instance. Il faudrait l'adaptateur Redis de Socket.IO (`@socket.io/redis-adapter`) et des sessions persistantes (*sticky sessions*).
 - **Déconnexion dans un autre onglet.** `/logout` efface le cookie, mais un socket déjà ouvert dans un autre onglet garde son identité jusqu'à sa fermeture. Il ne peut plus jouer (les actions passent par HTTP), mais il reçoit encore les diffusions et peut encore écrire dans le clavardage. Correction possible : fermer les sockets du salon `joueur:<id>` au `/logout`.
 - **Limite de débit du clavardage en mémoire.** Elle est perdue au redémarrage (sans gravité) et ne serait pas partagée entre plusieurs instances du serveur. La `Map` qui la garde (`derniersMessages`) n'est jamais vidée : une entrée par joueur ayant écrit depuis le démarrage, ce qui reste négligeable à notre échelle.
