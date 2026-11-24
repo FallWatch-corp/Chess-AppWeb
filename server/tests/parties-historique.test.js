@@ -55,6 +55,7 @@ test('l\'historique décrit la partie du point de vue de chaque joueur', async (
     cause: 'abandon',
     eloAvant: 1000,
     eloApres: 990,
+    cadence: { id: '10+0', categorie: 'rapide', base: 600, increment: 0 },
   });
   // une date ISO récente, ex. 2026-10-10T21:15:02Z
   assert.ok(Math.abs(Date.now() - new Date(date).getTime()) < 60_000);
