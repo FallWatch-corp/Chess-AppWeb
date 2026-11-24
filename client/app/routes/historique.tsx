@@ -2,6 +2,7 @@ import { Link, redirect } from "react-router";
 import type { Route } from "./+types/historique";
 import { appelerApi } from "../api.server";
 import { CAUSES, formaterVariation } from "../fin-partie";
+import { libelleCadence, type Cadence } from "../cadence";
 
 type PartieTerminee = {
   id: number;
@@ -12,6 +13,7 @@ type PartieTerminee = {
   eloAvant: number;
   eloApres: number;
   date: string | null;
+  cadence: Cadence;
 };
 
 const RESULTATS = { victoire: "Victoire", defaite: "Défaite", nulle: "Nulle" };
@@ -65,6 +67,7 @@ export default function Historique({ loaderData }: Route.ComponentProps) {
             <thead className="border-b text-sm text-gray-500">
               <tr>
                 <th className="p-2 font-medium">Date</th>
+                <th className="p-2 font-medium">Cadence</th>
                 <th className="p-2 font-medium">Adversaire</th>
                 <th className="p-2 font-medium">Ma couleur</th>
                 <th className="p-2 font-medium">Résultat</th>
@@ -75,6 +78,7 @@ export default function Historique({ loaderData }: Route.ComponentProps) {
               {parties.map((partie) => (
                 <tr key={partie.id} className="border-b">
                   <td className="p-2 whitespace-nowrap">{partie.date}</td>
+                  <td className="p-2 whitespace-nowrap">{libelleCadence(partie.cadence)}</td>
                   <td className="p-2 font-semibold">{partie.adversaire}</td>
                   <td className="p-2">{partie.couleur === "blanc" ? "Blancs" : "Noirs"}</td>
                   <td className="p-2">

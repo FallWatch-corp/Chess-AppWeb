@@ -11,6 +11,7 @@ import { ORDRE, calculerMateriel, type Materiel, type TypePiece } from "../piece
 import { usePartieEnDirect, type Presence } from "../hooks/usePartieEnDirect";
 import { Clavardage } from "../clavardage/Clavardage";
 import type { loader as rootLoader } from "../root";
+import { libelleCadence, type Cadence } from "../cadence";
 
 type Couleur = "blanc" | "noir";
 type JoueurPartie = { nom: string; elo: number };
@@ -27,6 +28,7 @@ type Partie = {
   noir: JoueurPartie | null;
   coups: string[];
   fin: Fin | null;
+  cadence: Cadence;
 };
 
 type EloPartie = { avant: number; apres: number };
@@ -120,6 +122,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
       <main className="container mx-auto flex flex-col items-center gap-6 p-8">
         <h1 className="text-2xl font-semibold">Partie privée</h1>
         <p className="text-gray-500">Vous êtes spectateur. La partie n'a pas encore commencé…</p>
+        <p className="text-gray-500">Cadence : {libelleCadence(partie.cadence)}</p>
         {clavardage}
       </main>
     );
@@ -135,6 +138,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
         </span>
         <BoutonCopier texte={partie.code} />
       </div>
+      <p className="text-gray-500">Cadence : {libelleCadence(partie.cadence)}</p>
       <p className="text-gray-500">En attente de votre adversaire…</p>
       {clavardage}
     </main>
@@ -203,6 +207,7 @@ function PartieEnCours({
       ) : (
         <p className="text-lg font-medium">{messageTrait}</p>
       )}
+      <p className="text-sm text-gray-500">{libelleCadence(partie.cadence)}</p>
       {!partie.couleur && <p className="text-sm text-gray-500">Vous regardez cette partie en spectateur.</p>}
       <BandeauJoueur
         joueur={partie[adversaire]}

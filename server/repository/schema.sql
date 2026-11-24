@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS parties (
   elo_blanc_apres   INTEGER,
   elo_noir_avant    INTEGER,
   elo_noir_apres    INTEGER,
-  terminee_le       TEXT
+  terminee_le       TEXT,
+  cadence           TEXT NOT NULL DEFAULT '10+0'
 );
 
 CREATE TABLE IF NOT EXISTS coups (

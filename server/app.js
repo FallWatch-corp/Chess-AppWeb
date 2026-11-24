@@ -5,6 +5,7 @@ const { readSession } = require('./session.js');
 const routesAuth = require('./routes/auth.js');
 const routesParties = require('./routes/parties.js');
 const { ErreurApi } = require('./services/erreur-api.js');
+const { CADENCES } = require('./services/cadences.js');
 
 const app = express();
 
@@ -25,6 +26,10 @@ app.use('/api/auth', routesAuth);
 app.get('/api/moi', exigerConnexion, (req, res) => {
   const { nom, elo } = req.joueur;
   res.json({ nom, elo });
+});
+
+app.get('/api/cadences', (req, res) => {
+  res.json(CADENCES);
 });
 
 app.use('/api/parties', routesParties);
