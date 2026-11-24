@@ -10,7 +10,7 @@ const request = require('supertest');
 const app = require('../app.js');
 const { trouverOuCreerJoueur } = require('../repository/joueurs.js');
 const { creerPartie, rejoindrePartie } = require('../services/parties.js');
-const { demarrerServeur, cookiePour, connecterSocket, attendre } = require('./helpers/temps-reel.js');
+const { demarrerServeur, cookiePour, connecterSocket, attendre, attendreQue } = require('./helpers/temps-reel.js');
 
 const alice = trouverOuCreerJoueur({ githubId: 1, nom: 'alice' });
 const bob = trouverOuCreerJoueur({ githubId: 2, nom: 'bob' });
@@ -60,6 +60,34 @@ test('bob revient après une coupure et reçoit le coup joué pendant son absenc
   assert.deepEqual(etat.coups, ['e4']);
   assert.equal(etat.trait, 'noir');
   assert.equal(etat.couleur, 'noir');
+});
+
+test('alice voit bob repasser en ligne après une coupure', { timeout: 5000 }, async (t) => {
+  const id = partieEnCours();
+
+  // 1. alice et bob rejoignent la partie
+  const premier = connecterSocket(serveur.url, cookiePour(bob.id));
+  t.after(() => premier.close());
+  await rejoindre(premier, id);
+  const socketAlice = connecterSocket(serveur.url, cookiePour(alice.id));
+  t.after(() => socketAlice.close());
+  await rejoindre(socketAlice, id);
+
+  // 2. bob perd sa connexion : alice le voit hors ligne
+  const horsLigne = attendreQue(socketAlice, 'partie:presence', (presence) => presence.noir === 'hors_ligne');
+  premier.close();
+  await horsLigne;
+
+  // 3. bob revient : alice le voit de nouveau en ligne
+  const enLigne = attendreQue(socketAlice, 'partie:presence', (presence) => presence.noir === 'en_ligne');
+  const retour = connecterSocket(serveur.url, cookiePour(bob.id));
+  t.after(() => retour.close());
+  await rejoindre(retour, id);
+  
+  
+  // 4. l'annonce dit que les deux joueurs sont en ligne
+  const presence = await enLigne;
+  assert.deepEqual(presence, { blanc: 'en_ligne', noir: 'en_ligne' });
 });
 
 // Limite : le serveur est arrêté puis relancé dans le même programme Node.
