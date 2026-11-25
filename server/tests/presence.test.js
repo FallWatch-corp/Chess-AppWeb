@@ -41,7 +41,8 @@ async function presenceNumero(socket, numero) {
     if (Date.now() - debut > 2000) throw new Error(`présence n°${numero} jamais reçue`);
     await new Promise((ok) => setTimeout(ok, 10));
   }
-  return socket.presences[numero - 1];
+  const { blanc, noir } = socket.presences[numero - 1];
+  return { blanc, noir };
 }
 
 test('en arrivant, on reçoit la présence des deux joueurs', { timeout: 5000 }, async (t) => {
