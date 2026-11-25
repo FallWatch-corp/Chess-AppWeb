@@ -141,6 +141,7 @@ export default function PagePartie({ loaderData }: Route.ComponentProps) {
       </div>
       <p className="text-gray-500">Cadence : {libelleCadence(partie.cadence)}</p>
       <p className="text-gray-500">En attente de votre adversaire…</p>
+      <Spectateurs presence={presence} />
       {clavardage}
     </main>
   );
@@ -215,6 +216,7 @@ function PartieEnCours({
       )}
       <p className="text-sm text-gray-500">{libelleCadence(partie.cadence)}</p>
       {!partie.couleur && <p className="text-sm text-gray-500">Vous regardez cette partie en spectateur.</p>}
+      <Spectateurs presence={presence} />
       <BandeauJoueur
         joueur={partie[adversaire]}
         couleur={adversaire}
@@ -388,6 +390,18 @@ function PiecesPrises({ prises, avantage }: { prises: TypePiece[]; avantage: num
         </span>
       )}
     </span>
+  );
+}
+
+// Rien tant que la présence n'est pas arrivée (rendu serveur, connexion perdue).
+// aria-live : un lecteur d'écran annonce les arrivées et départs sans voler le focus.
+function Spectateurs({ presence }: { presence: Presence | null }) {
+  if (!presence) return null;
+  const n = presence.spectateurs;
+  return (
+    <p aria-live="polite" className="text-sm text-gray-500">
+      {n === 0 ? "Aucun spectateur" : `${n} spectateur${n > 1 ? "s" : ""}`}
+    </p>
   );
 }
 
