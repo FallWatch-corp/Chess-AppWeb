@@ -26,6 +26,7 @@ export type MessageClavardage = {
 export function usePartieEnDirect<T extends { id: number }>(urlApi: string, partieInitiale: T) {
   const [partie, setPartie] = useState(partieInitiale);
   const [connecte, setConnecte] = useState(false);
+  const [dejaConnecte, setDejaConnecte] = useState(false);
   const [presence, setPresence] = useState<Presence | null>(null);
   // Vide au rendu serveur : l'historique n'arrive que par le socket, donc dans le navigateur.
   const [messages, setMessages] = useState<MessageClavardage[]>([]);
@@ -49,6 +50,7 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
     // de rejoindre la partie, et le serveur renvoie l'état complet (coups manqués compris).
     socket.on("connect", () => {
       setConnecte(true);
+      setDejaConnecte(true);
       socket.emit("partie:rejoindre", partieInitiale.id, (reponse: { erreur?: string }) => {
         if (reponse.erreur) console.error(reponse.erreur);
       });
@@ -105,5 +107,5 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
     [partieInitiale.id],
   );
 
-  return { partie, connecte, presence, messages, envoyerMessage };
+  return { partie, connecte, presence, messages, envoyerMessage, dejaConnecte };
 }
