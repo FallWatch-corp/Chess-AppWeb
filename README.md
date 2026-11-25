@@ -269,12 +269,13 @@ Comme la position et la liste des coups sont en base, une partie survit à un re
 | Bullet | `1+0`, `2+1` |
 | Blitz | `3+0`, `3+2`, `5+0`, `5+2`, `5+5` |
 | Rapide | `10+0`, `15+0`, `15+10` |
+| Quotidien | `quotidien` : 1 jour pour chaque coup (voir [Les parties quotidiennes](#les-parties-quotidiennes)) |
 
-La pendule qui décompte ce temps viendra avec #58 ; pour l'instant, la cadence est enregistrée et affichée.
+La pendule qui décompte le temps des parties en direct viendra avec #58 ; pour l'instant, leur cadence est enregistrée et affichée.
 
 ### Une seule liste, côté serveur
 
-La liste n'existe qu'à un seul endroit : `server/services/cadences.js`. Chaque cadence y a un `id` (`"3+2"`), une `categorie` (`bullet`, `blitz` ou `rapide`), une `base` et un `increment`, **tous deux en secondes** (`3+2` → `base: 180, increment: 2`). Le client ne la recopie pas : il la demande au serveur (`GET /api/cadences`) pour afficher les boutons.
+La liste n'existe qu'à un seul endroit : `server/services/cadences.js`. Chaque cadence y a un `id` (`"3+2"`), une `categorie` (`bullet`, `blitz`, `rapide` ou `quotidien`), une `base` et un `increment`, **tous deux en secondes** (`3+2` → `base: 180, increment: 2`). Le client ne la recopie pas : il la demande au serveur (`GET /api/cadences`) pour afficher les boutons.
 
 Le client n'envoie qu'un **identifiant** de cette liste, jamais un temps : il ne peut pas inventer une cadence de 2 heures ou de 0 seconde.
 
@@ -295,6 +296,18 @@ Sur l'accueil, « Rejoindre » ne rejoint plus tout de suite. La page appelle d'
 ### En base
 
 La table `parties` garde seulement l'id, dans la colonne `cadence` (`TEXT NOT NULL DEFAULT '10+0'`). Le serveur retrouve la catégorie et les temps dans la liste à chaque lecture. Une base créée avant les cadences reçoit la colonne au démarrage (`ALTER TABLE` dans `server/repository/db.js`), et ses parties passent en `10+0`.
+
+### Les parties quotidiennes
+
+En quotidien (`{ "id": "quotidien", "categorie": "quotidien", "base": 86400, "increment": 0 }`), chaque joueur a **24 heures pour jouer chaque coup** : on joue à son rythme, sans rester devant l'écran. Ici, `base` est le temps par coup, pas le temps de la partie.
+
+- **L'échéance est en base.** La colonne `parties.echeance` (texte ISO, `null` pour les autres cadences) garde la date limite du prochain coup. Elle est posée quand l'adversaire rejoint, puis remise à 24 h à chaque coup, dans la même écriture que le coup (`prochaineEcheance` dans `server/services/cadences.js`). Comme elle est en base, elle survit à un redémarrage.
+- **Le serveur vérifie au démarrage, puis toutes les minutes** (`terminerLesRetards` dans `server/server.js`, qui appelle `verifierEcheances` de `server/services/echeances.js`). Une partie dont l'échéance est passée se termine **au temps** (cause `temps`) : le camp au trait perd, et les Elo changent comme pour une autre fin. Les joueurs connectés reçoivent la fin par `partie:etat`.
+- **Nulle si l'adversaire ne peut pas mater** : avec le roi seul, ou le roi et un seul fou ou cavalier, il ne pourrait pas gagner, donc la partie est nulle (cause `temps` aussi). C'est la règle de la FIDE pour une chute du drapeau.
+- **Un coup en retard est refusé**, même avant la vérification de la minute suivante : `POST /api/parties/:id/coups` répond `409` « Le temps est écoulé. ».
+- **Pas de délai de retour de 60 secondes** : fermer la page est normal en quotidien. La présence en ligne / hors ligne reste affichée, sans compte à rebours.
+- **Plusieurs parties en même temps** : rien n'empêche un joueur d'avoir plusieurs parties quotidiennes en cours, en plus d'une partie en direct.
+- **Côté client**, `GET /api/parties/:id` et `partie:etat` contiennent `echeance`. La page affiche « 18 h 42 min pour jouer », arrondi à la minute supérieure et mis à jour toutes les 30 secondes. Ce texte est calculé **seulement dans le navigateur** (après le premier rendu) : le serveur et le navigateur n'ont pas la même heure, et React refuserait deux rendus différents à l'hydratation. Une fois l'échéance passée, la page affiche « Temps écoulé » jusqu'à ce que le serveur termine la partie.
 
 ---
 
@@ -349,6 +362,7 @@ Un joueur qui se déconnecte en pleine partie a 60 secondes pour revenir. Sinon,
 - **À l'expiration**, le serveur appelle le même service qu'un abandon ordinaire (`abandonner` dans `server/services/fin-partie.js`) : même vérification, même calcul des deux Elo, même mise à jour conditionnelle en base. Puis il diffuse la partie terminée au salon.
 - **Les deux joueurs déconnectés** : chacun a sa minuterie. La première qui expire termine la partie ; la seconde est annulée, et un éventuel abandon tardif serait de toute façon refusé, car la partie n'est plus en cours.
 - **Seulement en partie en cours** : pas de délai en salle d'attente ni après la fin.
+- **Pas en quotidien** : une partie quotidienne n'a que son échéance de 24 h par coup (voir [Les parties quotidiennes](#les-parties-quotidiennes)).
 - **Le créateur absent quand l'adversaire arrive** : s'il a fermé son onglet en salle d'attente, son délai de 60 secondes commence dès que l'adversaire rejoint, puisque la partie est alors en cours. C'est voulu : sans ce délai, la partie resterait bloquée indéfiniment.
 - **Calculer la présence démarre et annule les minuteries.** `presencePartie` (`server/temps-reel/presence.js`) ne se contente pas de lire les connexions : elle appelle `synchroniserDelais`. Un délai déjà commencé n'est jamais relancé : un spectateur qui arrive, ou un nouveau calcul, ne remet pas les 60 secondes à zéro.
 - **Le navigateur ne fait qu'afficher.** Le serveur envoie le temps restant en millisecondes (et pas une heure), ce qui évite les écarts entre l'horloge du serveur et celle du navigateur. Le client en déduit une échéance locale et affiche le compte à rebours à côté du joueur déconnecté. Il ne termine jamais la partie lui-même : la fin arrive par `partie:etat`.
