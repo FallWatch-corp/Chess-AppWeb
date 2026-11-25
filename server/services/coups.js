@@ -32,7 +32,7 @@ function causeDeNulle(echecs) {
 
 // Le serveur est l'arbitre : on repart toujours de la FEN en base,
 // jamais de ce que le client croit voir.
-function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}) {
+function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}, maintenant = new Date()) {
   const partie = trouverPartieParId(partieId);
   if (!partie) {
     throw new ErreurApi(404, 'Partie introuvable.');
@@ -55,6 +55,11 @@ function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}) {
   const monCamp = partie.blanc === joueurId ? 'w' : 'b';
   if (echecs.turn() !== monCamp) {
     throw new ErreurApi(409, 'Ce n\'est pas votre tour.');
+  }
+  // L'échéance peut être passée sans que la vérification périodique ait encore terminé la partie.
+  // Ce test vient après celui du tour : seul le joueur au trait peut être en retard.
+  if (partie.echeance !== null && partie.echeance < maintenant.toISOString()) {
+    throw new ErreurApi(409, 'Le temps est écoulé.');
   }
 
   // chess.js lance une exception si le coup est illégal

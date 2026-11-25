@@ -56,6 +56,13 @@ const selectTerminees = db.prepare(`
   ORDER BY p.terminee_le DESC, p.id DESC
 `);
 
+// Les parties quotidiennes dont la date limite du prochain coup est passée.
+// Les dates ISO se comparent comme du texte : '2026-11-25T…' < '2026-11-26T…'.
+const selectEnRetard = db.prepare(`
+  SELECT id FROM parties
+  WHERE statut = 'en_cours' AND echeance IS NOT NULL AND echeance < ?
+`);
+
 // ordre = nombre de coups déjà joués + 1
 const insertCoup = db.prepare(`
   INSERT INTO coups (partie, ordre, coup)
@@ -103,7 +110,8 @@ function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup, echeance = null }
 // Fin de partie : le dernier coup (s'il y en a un), la position, le statut, le résultat,
 // la cause et les deux nouveaux Elo sont enregistrés ensemble ou pas du tout.
 // resultat : 'blanc', 'noir' ou 'nulle'.
-// cause : 'mat', 'abandon', ou pour une nulle 'pat', 'materiel_insuffisant', 'repetition', 'cinquante_coups'.
+// cause : 'mat', 'abandon', 'temps' (quotidien), ou pour une nulle 'pat', 'materiel_insuffisant',
+// 'repetition', 'cinquante_coups'. Une nulle au temps (gagnant sans matériel pour mater) garde 'temps'.
 // Sans coup (abandon), ancienneFen, nouvelleFen et coup sont absents.
 // Retourne false si la partie n'était plus en cours (rien n'est enregistré).
 function enregistrerFinDePartie({
@@ -140,6 +148,10 @@ function listerCoups(partieId) {
   return selectCoups.all(partieId).map((ligne) => ligne.coup);
 }
 
+function listerPartiesEnRetard(maintenantIso) {
+  return selectEnRetard.all(maintenantIso);
+}
+
 module.exports = {
   insererPartie,
   trouverPartieParId,
@@ -149,4 +161,5 @@ module.exports = {
   enregistrerFinDePartie,
   listerCoups,
   listerPartiesTerminees,
+  listerPartiesEnRetard,
 };
