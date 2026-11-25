@@ -1,6 +1,6 @@
 # Chess-AppWeb
 
-Application web d'échecs en ligne : on se connecte avec GitHub, on crée une partie privée, on partage son code, et on joue contre la personne qui l'a reçu. Chaque joueur a un classement Elo.
+Application web d'échecs en ligne : on se connecte avec GitHub, on crée une partie privée en choisissant sa cadence, on partage son code, et on joue contre la personne qui l'a reçu. Chaque joueur a un classement Elo.
 
 | Partie | Technologies |
 | --- | --- |
@@ -14,6 +14,7 @@ Le dépôt est un monorepo npm avec deux *workspaces* : `server` et `client`. Un
 - [Lancer les tests](#lancer-les-tests)
 - [Déployer avec Docker](#déployer-avec-docker)
 - [Règles des échecs : chess.js](#règles-des-échecs--chessjs)
+- [Cadences](#cadences)
 - [Temps réel : Socket.IO](#temps-réel--socketio)
 
 ---
@@ -259,6 +260,44 @@ Comme la position et la liste des coups sont en base, une partie survit à un re
 
 ---
 
+## Cadences
+
+À la création, le joueur choisit une cadence parmi des boutons regroupés par catégorie. Une cadence s'écrit `base+incrément` : `3+2` veut dire 3 minutes pour toute la partie, plus 2 secondes ajoutées après chaque coup.
+
+| Catégorie | Cadences |
+| --- | --- |
+| Bullet | `1+0`, `2+1` |
+| Blitz | `3+0`, `3+2`, `5+0`, `5+2`, `5+5` |
+| Rapide | `10+0`, `15+0`, `15+10` |
+
+La pendule qui décompte ce temps viendra avec #58 ; pour l'instant, la cadence est enregistrée et affichée.
+
+### Une seule liste, côté serveur
+
+La liste n'existe qu'à un seul endroit : `server/services/cadences.js`. Chaque cadence y a un `id` (`"3+2"`), une `categorie` (`bullet`, `blitz` ou `rapide`), une `base` et un `increment`, **tous deux en secondes** (`3+2` → `base: 180, increment: 2`). Le client ne la recopie pas : il la demande au serveur (`GET /api/cadences`) pour afficher les boutons.
+
+Le client n'envoie qu'un **identifiant** de cette liste, jamais un temps : il ne peut pas inventer une cadence de 2 heures ou de 0 seconde.
+
+### L'API
+
+| Requête | Réponse |
+| --- | --- |
+| `GET /api/cadences` | La liste complète. Publique (pas besoin d'être connecté). |
+| `POST /api/parties` avec `{ "cadence": "3+2" }` | `201` et la partie créée. Sans `cadence`, la partie est en `10+0`. Un id qui n'est pas dans la liste répond `400` « Cadence inconnue. », et rien n'est enregistré. |
+| `GET /api/parties/code/:code` | L'aperçu avant de rejoindre : `{ "createur": "alice", "cadence": { … } }`, rien d'autre. Le code est accepté en minuscules et avec des espaces, comme pour `/rejoindre`. `404` si le code est inconnu, `409` si la partie a déjà commencé. Connexion obligatoire. |
+
+`GET /api/parties/:id`, la diffusion `partie:etat` et l'historique (`GET /api/parties`) contiennent aussi la cadence, toujours sous sa forme complète : `{ "id": "3+2", "categorie": "blitz", "base": 180, "increment": 2 }`.
+
+### Rejoindre en deux temps
+
+Sur l'accueil, « Rejoindre » ne rejoint plus tout de suite. La page appelle d'abord l'aperçu et affiche « Partie de alice · Blitz 3 min + 2 s », avec un bouton « Rejoindre la partie » qui envoie le vrai `POST /api/parties/rejoindre`. On sait ainsi à quel rythme on va jouer avant de s'engager.
+
+### En base
+
+La table `parties` garde seulement l'id, dans la colonne `cadence` (`TEXT NOT NULL DEFAULT '10+0'`). Le serveur retrouve la catégorie et les temps dans la liste à chaque lecture. Une base créée avant les cadences reçoit la colonne au démarrage (`ALTER TABLE` dans `server/repository/db.js`), et ses parties passent en `10+0`.
+
+---
+
 ## Temps réel : Socket.IO
 
 Quand un joueur joue, son adversaire et les spectateurs voient le coup **aussitôt**, sans recharger la page : c'est le serveur qui prévient le navigateur, par une connexion Socket.IO.
@@ -281,7 +320,7 @@ Le même parcours vaut pour l'abandon et pour l'arrivée de l'adversaire dans la
 | --- | --- | --- | --- |
 | `partie:rejoindre` | client → serveur | l'id de la partie, et un accusé de réception | Entrer dans le salon `partie:<id>`. Réponse `{ ok: true }` ou `{ erreur }` |
 | `partie:etat` | serveur → client | l'état complet de la partie (le même objet que `GET /api/parties/:id`) | Envoyé à l'arrivée dans le salon, puis à chaque changement |
-| `partie:presence` | serveur → client | `{ blanc, noir }`, chacun `en_ligne` ou `hors_ligne` | Envoyé à tout le salon quand quelqu'un y entre ou se déconnecte |
+| `partie:presence` | serveur → client | `{ blanc, noir, retour }` : chaque couleur `en_ligne` ou `hors_ligne`, et dans `retour` les millisecondes qu'il reste à un joueur déconnecté pour revenir (`null` sans délai) | Envoyé à tout le salon quand quelqu'un y entre ou se déconnecte |
 | `partie:coup`, `partie:abandon` | client → serveur | `{ partieId }`, et un accusé de réception | Toujours refusés, la partie n'est jamais modifiée. Réponse selon `socket.data` : « Vous devez être connecté. », « Vous ne participez pas à cette partie. » ou, pour un joueur, « Les coups et l'abandon se font par HTTP. » |
 
 L'état est fabriqué à un seul endroit, `server/services/etat-partie.js`, utilisé à la fois par la route HTTP et par Socket.IO : les deux chemins envoient toujours le même format.
@@ -301,6 +340,19 @@ Un socket perd ses salons à chaque déconnexion. Le client redemande donc `part
 - Elle est recalculée et envoyée à tout le salon quand un socket entre dans la partie (`partie:rejoindre`) et quand un socket se déconnecte. À la déconnexion, le socket a déjà quitté ses salons : on note donc ses parties dans l'événement `disconnecting`, puis on recalcule dans `disconnect`.
 - **Deuxième onglet : permis.** Un joueur peut ouvrir la même partie dans plusieurs onglets ou appareils. Fermer un onglet ne le met pas hors ligne tant qu'un autre reste ouvert, puisqu'on compte les joueurs et non les sockets. Les actions passent par HTTP et le serveur refuse un coup hors tour : deux onglets ne peuvent pas jouer deux fois.
 - Côté client, l'indicateur s'affiche à côté de l'adversaire ; un spectateur le voit à côté des deux joueurs. Si notre propre connexion tombe, l'indicateur disparaît jusqu'à la reconnexion, plutôt que d'afficher une information périmée.
+
+### Le délai de retour (60 secondes)
+
+Un joueur qui se déconnecte en pleine partie a 60 secondes pour revenir. Sinon, il perd par abandon.
+
+- **C'est le serveur qui décide** (`server/temps-reel/delai-retour.js`). À chaque calcul de la présence, un joueur `hors_ligne` dans une partie `en_cours` reçoit une minuterie `setTimeout` de 60 secondes, et un joueur revenu `en_ligne` voit la sienne annulée.
+- **À l'expiration**, le serveur appelle le même service qu'un abandon ordinaire (`abandonner` dans `server/services/fin-partie.js`) : même vérification, même calcul des deux Elo, même mise à jour conditionnelle en base. Puis il diffuse la partie terminée au salon.
+- **Les deux joueurs déconnectés** : chacun a sa minuterie. La première qui expire termine la partie ; la seconde est annulée, et un éventuel abandon tardif serait de toute façon refusé, car la partie n'est plus en cours.
+- **Seulement en partie en cours** : pas de délai en salle d'attente ni après la fin.
+- **Le créateur absent quand l'adversaire arrive** : s'il a fermé son onglet en salle d'attente, son délai de 60 secondes commence dès que l'adversaire rejoint, puisque la partie est alors en cours. C'est voulu : sans ce délai, la partie resterait bloquée indéfiniment.
+- **Calculer la présence démarre et annule les minuteries.** `presencePartie` (`server/temps-reel/presence.js`) ne se contente pas de lire les connexions : elle appelle `synchroniserDelais`. Un délai déjà commencé n'est jamais relancé : un spectateur qui arrive, ou un nouveau calcul, ne remet pas les 60 secondes à zéro.
+- **Le navigateur ne fait qu'afficher.** Le serveur envoie le temps restant en millisecondes (et pas une heure), ce qui évite les écarts entre l'horloge du serveur et celle du navigateur. Le client en déduit une échéance locale et affiche le compte à rebours à côté du joueur déconnecté. Il ne termine jamais la partie lui-même : la fin arrive par `partie:etat`.
+- La variable `DELAI_RETOUR_MS` (optionnelle, 60000 par défaut) change la durée. Les tests la mettent à 300 ms.
 
 ### L'identité d'une connexion
 
@@ -361,6 +413,7 @@ Joueurs et spectateurs discutent sous l'échiquier, en salle d'attente, pendant 
 
 ### Limites connues
 
+- **Délai de retour en mémoire.** Les minuteries de 60 secondes sont perdues si le serveur redémarre : un joueur déconnecté à ce moment-là n'aura plus de délai jusqu'au prochain calcul de la présence. L'enregistrement de l'échéance en base est prévu avec #60.
 - **Une seule instance du serveur.** Les salons vivent en mémoire, dans le processus Node. Avec deux instances derrière un répartiteur de charge, une diffusion n'atteindrait que les clients de la même instance. Il faudrait l'adaptateur Redis de Socket.IO (`@socket.io/redis-adapter`) et des sessions persistantes (*sticky sessions*).
 - **Déconnexion dans un autre onglet.** `/logout` efface le cookie, mais un socket déjà ouvert dans un autre onglet garde son identité jusqu'à sa fermeture. Il ne peut plus jouer (les actions passent par HTTP), mais il reçoit encore les diffusions et peut encore écrire dans le clavardage. Correction possible : fermer les sockets du salon `joueur:<id>` au `/logout`.
 - **Limite de débit du clavardage en mémoire.** Elle est perdue au redémarrage (sans gravité) et ne serait pas partagée entre plusieurs instances du serveur. La `Map` qui la garde (`derniersMessages`) n'est jamais vidée : une entrée par joueur ayant écrit depuis le démarrage, ce qui reste négligeable à notre échelle.
