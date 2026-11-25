@@ -29,6 +29,7 @@ type Partie = {
   coups: string[];
   fin: Fin | null;
   cadence: Cadence;
+  echeance: string | null; // date limite du prochain coup en quotidien (texte ISO), null sinon
 };
 
 type EloPartie = { avant: number; apres: number };
@@ -173,7 +174,7 @@ function PartieEnCours({
   const fenOptimiste = fetcher.formData?.get("fenApres");
   const fen = typeof fenOptimiste === "string" && fenOptimiste !== "" ? fenOptimiste : partie.fen;
   const peutJouer = enCours && partie.trait === partie.couleur && fetcher.state === "idle";
-    // Pièces prises et avantage matériel, calculés sur la position affichée
+  // Pièces prises et avantage matériel, calculés sur la position affichée
   const materiel = calculerMateriel(fen);
 
   function abandonner() {
@@ -207,6 +208,7 @@ function PartieEnCours({
       ) : (
         <p className="text-lg font-medium">{messageTrait}</p>
       )}
+      {enCours && partie.echeance && <TempsPourJouer echeance={partie.echeance} />}
       <p className="text-sm text-gray-500">{libelleCadence(partie.cadence)}</p>
       {!partie.couleur && <p className="text-sm text-gray-500">Vous regardez cette partie en spectateur.</p>}
       <BandeauJoueur
@@ -223,7 +225,7 @@ function PartieEnCours({
         theme={theme}
         onCoup={peutJouer ? jouer : undefined}
       />
-            <BandeauJoueur
+      <BandeauJoueur
         joueur={partie[moi]}
         couleur={moi}
         trait={trait}
@@ -331,6 +333,32 @@ function BandeauJoueur({
       {trait === couleur && <span className="text-sm text-gray-500">au trait</span>}
     </div>
   );
+}
+
+// « 18 h 42 min pour jouer » en quotidien. Calculé seulement dans le navigateur :
+// le serveur et le navigateur n'ont pas la même heure, React refuserait deux rendus différents.
+function TempsPourJouer({ echeance }: { echeance: string }) {
+  const [heure, setHeure] = useState<number | null>(null);
+
+  useEffect(() => {
+    setHeure(Date.now()); // tout de suite, sans attendre les 30 premières secondes
+    const minuterie = setInterval(() => setHeure(Date.now()), 30_000);
+    return () => clearInterval(minuterie);
+  }, []);
+
+  if (heure === null) return null; // pendant le rendu serveur
+
+  const reste = Date.parse(echeance) - heure;
+  if (reste <= 0) return <p className="text-sm text-red-600">Temps écoulé</p>;
+
+  // Arrondi à la minute supérieure : « 1 min » jusqu'à la dernière seconde, jamais « 0 min ».
+  // Plafonné à 24 h : l'horloge du serveur, un peu en avance, donnerait sinon « 24 h 1 min » juste après un coup.
+  const minutes = Math.min(Math.ceil(reste / 60_000), 24 * 60);
+
+  const h = Math.floor(minutes / 60);
+  const min = minutes % 60;
+  const texte = h > 0 ? `${h} h ${min} min` : `${min} min`;
+  return <p className="text-sm text-gray-500">{texte} pour jouer</p>;
 }
 
 function CompteARebours({ echeance }: { echeance: number }) {
