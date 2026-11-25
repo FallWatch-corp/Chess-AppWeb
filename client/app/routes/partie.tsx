@@ -221,6 +221,7 @@ function PartieEnCours({
         trait={trait}
         materiel={materiel[adversaire]}
         enLigne={presence ? presence[adversaire] === "en_ligne" : undefined}
+        echeance={enCours ? presence?.echeances[adversaire] : null}
       />
       <Echiquier
         fen={fen}
@@ -234,6 +235,7 @@ function PartieEnCours({
         trait={trait}
         materiel={materiel[moi]}
         enLigne={presence && !partie.couleur ? presence[moi] === "en_ligne" : undefined}
+        echeance={enCours && !partie.couleur ? presence?.echeances[moi] : null}
       />
       {enCours && partie.couleur && (
         <button
@@ -297,12 +299,14 @@ function BandeauJoueur({
   trait,
   materiel,
   enLigne,
+  echeance,
 }: {
   joueur: JoueurPartie | null;
   couleur: Couleur;
   trait: Couleur | null;
   materiel: Materiel;
   enLigne?: boolean;
+  echeance?: number | null;
 }) {
   return (
     <div className="flex w-full max-w-140 items-center justify-between">
@@ -327,10 +331,29 @@ function BandeauJoueur({
             </span>
           )}
         </span>
+        {enLigne === false && echeance && <CompteARebours echeance={echeance} />}
         <PiecesPrises prises={materiel.prises} avantage={materiel.avantage} />
       </div>
       {trait === couleur && <span className="text-sm text-gray-500">au trait</span>}
     </div>
+  );
+}
+
+function CompteARebours({ echeance }: { echeance: number }) {
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+
+  useEffect(() => {
+    const minuterie = setInterval(() => setMaintenant(Date.now()), 250);
+    return () => clearInterval(minuterie);
+  }, []);
+
+  const secondes = Math.max(0, Math.ceil((echeance - maintenant) / 1000));
+  const affichage = `${Math.floor(secondes / 60)}:${String(secondes % 60).padStart(2, "0")}`;
+
+  return (
+    <span role="timer" className="text-sm text-red-600">
+      Déconnecté : <span className="font-mono">{affichage}</span> pour revenir, sinon défaite par abandon
+    </span>
   );
 }
 

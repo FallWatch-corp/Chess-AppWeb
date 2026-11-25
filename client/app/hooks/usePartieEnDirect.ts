@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
 export type EtatPresence = "en_ligne" | "hors_ligne";
-export type Presence = { blanc: EtatPresence; noir: EtatPresence };
+type Couleurs<T> = { blanc: T; noir: T };
+type PresenceRecue = Couleurs<EtatPresence> & { retour: Couleurs<number | null> };
+export type Presence = Couleurs<EtatPresence> & { echeances: Couleurs<number | null> };
+
+function versEcheance(resteMs: number | null) {
+  return resteMs === null ? null : Date.now() + resteMs;
+}
 
 // Un message tel que le serveur l'envoie (server/services/clavardage.js, messagePublic).
 // role est calculé par le serveur : "joueur" = le créateur, tant que sa couleur n'est pas tirée.
@@ -54,7 +60,13 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
       setPresence(null);
     });
     socket.on("partie:etat", (etat: T) => setPartie(etat));
-    socket.on("partie:presence", (nouvelle: Presence) => setPresence(nouvelle));
+    socket.on("partie:presence", ({ blanc, noir, retour }: PresenceRecue) =>
+      setPresence({
+        blanc,
+        noir,
+        echeances: { blanc: versEcheance(retour.blanc), noir: versEcheance(retour.noir) },
+      }),
+    );
 
     // Tous les écouteurs sont posés ici, AVANT que la connexion aboutisse :
     // l'historique, envoyé juste après partie:rejoindre, ne peut donc pas arriver sans personne pour l'écouter.
