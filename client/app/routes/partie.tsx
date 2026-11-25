@@ -63,6 +63,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     de: formulaire.get("de"),
     vers: formulaire.get("vers"),
     promotion: formulaire.get("promotion") || undefined,
+    numero: Number(formulaire.get("numero")),
   };
 
   const reponse =
@@ -195,7 +196,7 @@ function PartieEnCours({
     }
     // pas besoin d'attendre : la page se met à jour quand le loader a rechargé la partie
     void fetcher.submit(
-      { de: coup.de, vers: coup.vers, promotion: coup.promotion ?? "", fenApres },
+      { de: coup.de, vers: coup.vers, promotion: coup.promotion ?? "", numero: partie.coups.length, fenApres },
       { method: "post" },
     );
     return fenApres !== "";
