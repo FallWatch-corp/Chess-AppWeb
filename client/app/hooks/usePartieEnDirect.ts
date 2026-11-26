@@ -3,8 +3,9 @@ import { io, type Socket } from "socket.io-client";
 
 export type EtatPresence = "en_ligne" | "hors_ligne";
 type Couleurs<T> = { blanc: T; noir: T };
-type PresenceRecue = Couleurs<EtatPresence> & { retour: Couleurs<number | null> };
-export type Presence = Couleurs<EtatPresence> & { echeances: Couleurs<number | null> };
+// spectateurs : calculé par le serveur, sans les joueurs (server/temps-reel/presence.js)
+type PresenceRecue = Couleurs<EtatPresence> & { retour: Couleurs<number | null>; spectateurs: number };
+export type Presence = Couleurs<EtatPresence> & { echeances: Couleurs<number | null>; spectateurs: number };
 
 function versEcheance(resteMs: number | null) {
   return resteMs === null ? null : Date.now() + resteMs;
@@ -60,10 +61,11 @@ export function usePartieEnDirect<T extends { id: number }>(urlApi: string, part
       setPresence(null);
     });
     socket.on("partie:etat", (etat: T) => setPartie(etat));
-    socket.on("partie:presence", ({ blanc, noir, retour }: PresenceRecue) =>
+    socket.on("partie:presence", ({ blanc, noir, retour, spectateurs }: PresenceRecue) =>
       setPresence({
         blanc,
         noir,
+        spectateurs,
         echeances: { blanc: versEcheance(retour.blanc), noir: versEcheance(retour.noir) },
       }),
     );

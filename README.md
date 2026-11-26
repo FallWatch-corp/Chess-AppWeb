@@ -320,7 +320,7 @@ Le même parcours vaut pour l'abandon et pour l'arrivée de l'adversaire dans la
 | --- | --- | --- | --- |
 | `partie:rejoindre` | client → serveur | l'id de la partie, et un accusé de réception | Entrer dans le salon `partie:<id>`. Réponse `{ ok: true }` ou `{ erreur }` |
 | `partie:etat` | serveur → client | l'état complet de la partie (le même objet que `GET /api/parties/:id`) | Envoyé à l'arrivée dans le salon, puis à chaque changement |
-| `partie:presence` | serveur → client | `{ blanc, noir, retour }` : chaque couleur `en_ligne` ou `hors_ligne`, et dans `retour` les millisecondes qu'il reste à un joueur déconnecté pour revenir (`null` sans délai) | Envoyé à tout le salon quand quelqu'un y entre ou se déconnecte |
+| `partie:presence` | serveur → client | `{ blanc, noir, retour, spectateurs }` : chaque couleur `en_ligne` ou `hors_ligne`, dans `retour` les millisecondes qu'il reste à un joueur déconnecté pour revenir (`null` sans délai), et `spectateurs` le nombre de spectateurs | Envoyé à tout le salon quand quelqu'un y entre ou se déconnecte |
 | `partie:coup`, `partie:abandon` | client → serveur | `{ partieId }`, et un accusé de réception | Toujours refusés, la partie n'est jamais modifiée. Réponse selon `socket.data` : « Vous devez être connecté. », « Vous ne participez pas à cette partie. » ou, pour un joueur, « Les coups et l'abandon se font par HTTP. » |
 
 L'état est fabriqué à un seul endroit, `server/services/etat-partie.js`, utilisé à la fois par la route HTTP et par Socket.IO : les deux chemins envoient toujours le même format.
@@ -339,6 +339,7 @@ Un socket perd ses salons à chaque déconnexion. Le client redemande donc `part
 - La présence se déduit des connexions ouvertes dans le salon `partie:<id>` (`server/temps-reel/presence.js`) : un joueur est `en_ligne` si au moins un socket du salon porte son identité (`socket.data.joueur`). Un spectateur ou un anonyme ne compte pour aucune couleur.
 - Elle est recalculée et envoyée à tout le salon quand un socket entre dans la partie (`partie:rejoindre`) et quand un socket se déconnecte. À la déconnexion, le socket a déjà quitté ses salons : on note donc ses parties dans l'événement `disconnecting`, puis on recalcule dans `disconnect`.
 - **Deuxième onglet : permis.** Un joueur peut ouvrir la même partie dans plusieurs onglets ou appareils. Fermer un onglet ne le met pas hors ligne tant qu'un autre reste ouvert, puisqu'on compte les joueurs et non les sockets. Les actions passent par HTTP et le serveur refuse un coup hors tour : deux onglets ne peuvent pas jouer deux fois.
+- **Nombre de spectateurs.** Il arrive avec la présence, donc se met à jour à chaque arrivée ou départ, et s'affiche à tous (joueurs et spectateurs). Le créateur et les deux joueurs ne comptent pas. **Deux onglets :** un spectateur connecté compte **une seule fois**, quel que soit son nombre d'onglets (on le reconnaît à son compte). Un anonyme compte **une fois par onglet** : rien ne permet de savoir que deux connexions anonymes viennent de la même personne.
 - Côté client, l'indicateur s'affiche à côté de l'adversaire ; un spectateur le voit à côté des deux joueurs. Si notre propre connexion tombe, l'indicateur disparaît jusqu'à la reconnexion, plutôt que d'afficher une information périmée.
 
 ### Le délai de retour (60 secondes)

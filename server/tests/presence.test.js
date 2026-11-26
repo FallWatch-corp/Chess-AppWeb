@@ -103,3 +103,52 @@ test('en salle d\'attente, la couleur sans joueur est hors ligne', { timeout: 50
 
   assert.deepEqual(await presenceNumero(socketAlice, 1), { blanc: 'hors_ligne', noir: 'hors_ligne' });
 });
+
+async function spectateursNumero(socket, numero) {
+  await presenceNumero(socket, numero);
+  return socket.presences[numero - 1].spectateurs;
+}
+
+test('les joueurs ne comptent pas comme spectateurs', { timeout: 5000 }, async (t) => {
+  const id = partieEnCours();
+  const socketAlice = ouvrir(t, alice);
+  await socketAlice.emitWithAck('partie:rejoindre', id);
+  const socketBob = ouvrir(t, bob);
+  await socketBob.emitWithAck('partie:rejoindre', id);
+
+  assert.equal(await spectateursNumero(socketAlice, 2), 0);
+});
+
+test('le nombre de spectateurs suit les arrivées et les départs', { timeout: 5000 }, async (t) => {
+  const id = partieEnCours();
+  const socketAlice = ouvrir(t, alice);
+  await socketAlice.emitWithAck('partie:rejoindre', id);
+  const socketCarole = ouvrir(t, carole);
+  await socketCarole.emitWithAck('partie:rejoindre', id);
+  const socketAnonyme = ouvrir(t, null);
+  await socketAnonyme.emitWithAck('partie:rejoindre', id);
+  assert.equal(await spectateursNumero(socketAlice, 3), 2);
+
+  socketCarole.close();
+  assert.equal(await spectateursNumero(socketAlice, 4), 1);
+});
+
+test('deux onglets : un spectateur connecté compte une fois, un anonyme une fois par onglet', { timeout: 5000 }, async (t) => {
+  const id = partieEnCours();
+  const socketAlice = ouvrir(t, alice);
+  await socketAlice.emitWithAck('partie:rejoindre', id);
+  for (const joueur of [carole, carole, null, null]) {
+    await ouvrir(t, joueur).emitWithAck('partie:rejoindre', id);
+  }
+
+  assert.equal(await spectateursNumero(socketAlice, 5), 3);
+});
+
+test('en salle d\'attente, le créateur ne compte pas mais un anonyme oui', { timeout: 5000 }, async (t) => {
+  const partie = creerPartie(alice.id);
+  const socketAlice = ouvrir(t, alice);
+  await socketAlice.emitWithAck('partie:rejoindre', partie.id);
+  await ouvrir(t, null).emitWithAck('partie:rejoindre', partie.id);
+
+  assert.equal(await spectateursNumero(socketAlice, 2), 1);
+});
