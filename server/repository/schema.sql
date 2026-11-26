@@ -42,3 +42,10 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- l'historique se lit toujours par partie, du plus récent au plus ancien
 CREATE INDEX IF NOT EXISTS messages_par_partie ON messages (partie, id);
+
+CREATE TABLE IF NOT EXISTS delais_retour (
+  partie     INTEGER NOT NULL REFERENCES parties(id),
+  couleur    TEXT NOT NULL CHECK (couleur IN ('blanc', 'noir')),
+  echeance   INTEGER NOT NULL,
+  PRIMARY KEY (partie, couleur)
+);

@@ -1,6 +1,8 @@
 const { setTimeout, clearTimeout } = require('node:timers');
 const { abandonner } = require('../services/fin-partie.js');
 const { ErreurApi } = require('../services/erreur-api.js');
+const { trouverPartieParId } = require('../repository/parties.js');
+const { enregistrerDelai, supprimerDelai, listerDelais } = require('../repository/delais-retour.js');
 
 const delais = new Map();
 
@@ -13,33 +15,38 @@ function cle(partieId, couleur) {
 }
 
 function annulerDelai(partieId, couleur) {
+  supprimerDelai(partieId, couleur);
   const delai = delais.get(cle(partieId, couleur));
   if (!delai) return;
   clearTimeout(delai.minuterie);
   delais.delete(cle(partieId, couleur));
 }
 
-function demarrerDelai(partieId, couleur, joueurId, quandExpire) {
-  if (delais.has(cle(partieId, couleur))) return;
-
-  const duree = dureeDelai();
+function planifier(partieId, couleur, joueurId, echeance, quandExpire) {
   const minuterie = setTimeout(() => {
     delais.delete(cle(partieId, couleur));
     expirer(partieId, joueurId, quandExpire);
-  }, duree);
+  }, Math.max(0, echeance - Date.now()));
   minuterie.unref();
-  delais.set(cle(partieId, couleur), { echeance: Date.now() + duree, minuterie });
+  delais.set(cle(partieId, couleur), { echeance, minuterie });
+}
+
+function demarrerDelai(partieId, couleur, joueurId, quandExpire) {
+  if (delais.has(cle(partieId, couleur))) return;
+  const echeance = Date.now() + dureeDelai();
+  enregistrerDelai(partieId, couleur, echeance);
+  planifier(partieId, couleur, joueurId, echeance, quandExpire);
 }
 
 function expirer(partieId, joueurId, quandExpire) {
+  annulerDelai(partieId, 'blanc');
+  annulerDelai(partieId, 'noir');
   try {
     abandonner(partieId, joueurId);
   } catch (erreur) {
     if (!(erreur instanceof ErreurApi)) console.error(erreur);
     return;
   }
-  annulerDelai(partieId, 'blanc');
-  annulerDelai(partieId, 'noir');
   quandExpire(partieId);
 }
 
@@ -54,6 +61,17 @@ function synchroniserDelais(partie, presence, quandExpire) {
   }
 }
 
+function reprendreDelais(quandExpire) {
+  for (const { partie: partieId, couleur, echeance } of listerDelais()) {
+    const partie = trouverPartieParId(partieId);
+    if (partie?.statut !== 'en_cours' || !partie[couleur]) {
+      supprimerDelai(partieId, couleur);
+    } else if (!delais.has(cle(partieId, couleur))) {
+      planifier(partieId, couleur, partie[couleur], echeance, quandExpire);
+    }
+  }
+}
+
 function tempsRestants(partieId) {
   const reste = (couleur) => {
     const delai = delais.get(cle(partieId, couleur));
@@ -62,4 +80,4 @@ function tempsRestants(partieId) {
   return { blanc: reste('blanc'), noir: reste('noir') };
 }
 
-module.exports = { synchroniserDelais, tempsRestants };
+module.exports = { synchroniserDelais, reprendreDelais, tempsRestants };
