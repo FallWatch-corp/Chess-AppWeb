@@ -35,4 +35,25 @@ function penduleApresCoup(partie, maintenant = new Date()) {
     tempsNoir: temps.noir,
   };
 }
-module.exports = { penduleAuDepart, penduleApresCoup };
+
+// Le temps qui reste à chaque joueur, en millisecondes, à l'instant maintenant.
+// On envoie une durée plutôt qu'une heure : la pendule reste juste même si l'horloge du client est décalée.
+// null en salle d'attente et en quotidien (pas de pendule).
+function penduleRestante(partie, maintenant = new Date()) {
+  if (partie.temps_blanc === null) return null;
+
+  const auTrait = partie.fen.split(' ')[1] === 'w' ? 'blanc' : 'noir';
+  const temps = { blanc: partie.temps_blanc, noir: partie.temps_noir };
+
+  if (partie.statut === 'en_cours') {
+    // seul le temps du joueur au trait s'écoule ; l'échéance est l'instant où il tombe à 0
+    temps[auTrait] = Math.max(0, Date.parse(partie.echeance) - maintenant.getTime());
+  } else if (partie.cause === 'temps') {
+    // perdu au temps : en base, le perdant a encore le temps qu'il avait au début de son tour
+    temps[auTrait] = 0;
+  }
+  // partie terminée autrement : les temps enregistrés au dernier coup, figés
+  return temps;
+}
+
+module.exports = { penduleAuDepart, penduleApresCoup, penduleRestante };
