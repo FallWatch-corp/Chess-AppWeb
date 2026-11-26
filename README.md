@@ -1,6 +1,6 @@
 # Chess-AppWeb
 
-Application web d'échecs en ligne : on se connecte avec GitHub, on crée une partie privée, on partage son code, et on joue contre la personne qui l'a reçu. Chaque joueur a un classement Elo.
+Application web d'échecs en ligne : on se connecte avec GitHub, on crée une partie privée en choisissant sa cadence, on partage son code, et on joue contre la personne qui l'a reçu. Chaque joueur a un classement Elo.
 
 | Partie | Technologies |
 | --- | --- |
@@ -14,6 +14,7 @@ Le dépôt est un monorepo npm avec deux *workspaces* : `server` et `client`. Un
 - [Lancer les tests](#lancer-les-tests)
 - [Déployer avec Docker](#déployer-avec-docker)
 - [Règles des échecs : chess.js](#règles-des-échecs--chessjs)
+- [Cadences](#cadences)
 - [Temps réel : Socket.IO](#temps-réel--socketio)
 
 ---
@@ -256,6 +257,44 @@ L'affichage de l'échiquier est confié à une autre bibliothèque, `react-chess
 Comme la position et la liste des coups sont en base, une partie survit à un redémarrage du serveur.
 
 **Côté client**, chess.js sert uniquement au confort d'affichage. Pendant l'envoi, on montre déjà la position après le coup (affichage optimiste). Dès que le serveur a répondu, la page affiche la FEN qu'il renvoie : si le coup est refusé, la pièce revient à sa place et le message d'erreur de l'API s'affiche.
+
+---
+
+## Cadences
+
+À la création, le joueur choisit une cadence parmi des boutons regroupés par catégorie. Une cadence s'écrit `base+incrément` : `3+2` veut dire 3 minutes pour toute la partie, plus 2 secondes ajoutées après chaque coup.
+
+| Catégorie | Cadences |
+| --- | --- |
+| Bullet | `1+0`, `2+1` |
+| Blitz | `3+0`, `3+2`, `5+0`, `5+2`, `5+5` |
+| Rapide | `10+0`, `15+0`, `15+10` |
+
+La pendule qui décompte ce temps viendra avec #58 ; pour l'instant, la cadence est enregistrée et affichée.
+
+### Une seule liste, côté serveur
+
+La liste n'existe qu'à un seul endroit : `server/services/cadences.js`. Chaque cadence y a un `id` (`"3+2"`), une `categorie` (`bullet`, `blitz` ou `rapide`), une `base` et un `increment`, **tous deux en secondes** (`3+2` → `base: 180, increment: 2`). Le client ne la recopie pas : il la demande au serveur (`GET /api/cadences`) pour afficher les boutons.
+
+Le client n'envoie qu'un **identifiant** de cette liste, jamais un temps : il ne peut pas inventer une cadence de 2 heures ou de 0 seconde.
+
+### L'API
+
+| Requête | Réponse |
+| --- | --- |
+| `GET /api/cadences` | La liste complète. Publique (pas besoin d'être connecté). |
+| `POST /api/parties` avec `{ "cadence": "3+2" }` | `201` et la partie créée. Sans `cadence`, la partie est en `10+0`. Un id qui n'est pas dans la liste répond `400` « Cadence inconnue. », et rien n'est enregistré. |
+| `GET /api/parties/code/:code` | L'aperçu avant de rejoindre : `{ "createur": "alice", "cadence": { … } }`, rien d'autre. Le code est accepté en minuscules et avec des espaces, comme pour `/rejoindre`. `404` si le code est inconnu, `409` si la partie a déjà commencé. Connexion obligatoire. |
+
+`GET /api/parties/:id`, la diffusion `partie:etat` et l'historique (`GET /api/parties`) contiennent aussi la cadence, toujours sous sa forme complète : `{ "id": "3+2", "categorie": "blitz", "base": 180, "increment": 2 }`.
+
+### Rejoindre en deux temps
+
+Sur l'accueil, « Rejoindre » ne rejoint plus tout de suite. La page appelle d'abord l'aperçu et affiche « Partie de alice · Blitz 3 min + 2 s », avec un bouton « Rejoindre la partie » qui envoie le vrai `POST /api/parties/rejoindre`. On sait ainsi à quel rythme on va jouer avant de s'engager.
+
+### En base
+
+La table `parties` garde seulement l'id, dans la colonne `cadence` (`TEXT NOT NULL DEFAULT '10+0'`). Le serveur retrouve la catégorie et les temps dans la liste à chaque lecture. Une base créée avant les cadences reçoit la colonne au démarrage (`ALTER TABLE` dans `server/repository/db.js`), et ses parties passent en `10+0`.
 
 ---
 

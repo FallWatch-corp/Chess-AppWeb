@@ -53,8 +53,8 @@ test('un code déjà pris est remplacé par un nouveau code', () => {
   const codes = ['DOUBLE', 'DOUBLE', 'UNIQUE'];
   const generer = () => codes.shift();
 
-  const premiere = creerPartie(alice.id, generer);
-  const seconde = creerPartie(alice.id, generer);
+  const premiere = creerPartie(alice.id, '10+0', generer);
+  const seconde = creerPartie(alice.id, '10+0', generer);
 
   assert.equal(premiere.code, 'DOUBLE');
   assert.equal(seconde.code, 'UNIQUE');

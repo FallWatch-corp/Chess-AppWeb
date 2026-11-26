@@ -17,5 +17,8 @@ for (const colonne of ['cause', 'terminee_le']) {
     db.exec(`ALTER TABLE parties ADD COLUMN ${colonne} TEXT`);
   }
 }
+if (!colonnesParties.includes('cadence')) {
+  db.exec(`ALTER TABLE parties ADD COLUMN cadence TEXT NOT NULL DEFAULT '10+0'`);
+}
 
 module.exports = db;
