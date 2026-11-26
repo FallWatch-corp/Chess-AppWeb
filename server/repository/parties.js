@@ -8,34 +8,36 @@ const insertPartie = db.prepare(`
 
 const selectParId = db.prepare(`
   SELECT id, code, createur, blanc, noir, fen, statut, cadence, resultat, cause,
-         elo_blanc_avant, elo_blanc_apres, elo_noir_avant, elo_noir_apres
+         elo_blanc_avant, elo_blanc_apres, elo_noir_avant, elo_noir_apres, echeance, temps_blanc, temps_noir
   FROM parties WHERE id = ?
 `);
 
 const selectParCode = db.prepare(`
-  SELECT id, code, createur, blanc, noir, fen, statut, cadence
+  SELECT id, code, createur, blanc, noir, fen, statut, cadence, echeance, temps_blanc, temps_noir
   FROM parties WHERE code = ?
 `);
 
 // Le WHERE statut = 'en_attente' est important : si deux joueurs rejoignent
 // en meme temps, seulement le premier va modifier la ligne.
 const updateDemarrer = db.prepare(`
-  UPDATE parties SET blanc = ?, noir = ?, statut = 'en_cours'
+  UPDATE parties SET blanc = ?, noir = ?, statut = 'en_cours', echeance = ?, temps_blanc = ?, temps_noir = ?
   WHERE id = ? AND statut = 'en_attente'
 `);
 
 // Le WHERE fen = ? fait comme pour demarrer : si deux coups arrivent en meme temps
 // sur la meme position, seulement le premier modifie la ligne.
 const updateFen = db.prepare(`
-  UPDATE parties SET fen = ?
+  UPDATE parties SET fen = ?, echeance = ?, temps_blanc = ?, temps_noir = ?
   WHERE id = ? AND fen = ? AND statut = 'en_cours'
 `);
 
 // Pour un abandon, les deux FEN valent null : la position ne change pas
 // et on ne vérifie pas qu'elle est restée la même (l'abandon vaut quelle que soit la position).
+// De même, sans coup (abandon, temps), la pendule garde ses valeurs ; un coup qui termine la partie l'enregistre.
 const updateTerminer = db.prepare(`
   UPDATE parties
   SET fen = COALESCE(?, fen), statut = 'terminee', resultat = ?, cause = ?,
+      echeance = COALESCE(?, echeance), temps_blanc = COALESCE(?, temps_blanc), temps_noir = COALESCE(?, temps_noir),
       elo_blanc_avant = ?, elo_blanc_apres = ?,
       elo_noir_avant = ?, elo_noir_apres = ?,
       terminee_le = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
@@ -54,6 +56,13 @@ const selectTerminees = db.prepare(`
   JOIN joueurs jn ON jn.id = p.noir
   WHERE p.statut = 'terminee' AND (p.blanc = ? OR p.noir = ?)
   ORDER BY p.terminee_le DESC, p.id DESC
+`);
+
+// Les parties quotidiennes dont la date limite du prochain coup est passée.
+// Les dates ISO se comparent comme du texte : '2026-11-25T…' < '2026-11-26T…'.
+const selectEnRetard = db.prepare(`
+  SELECT id FROM parties
+  WHERE statut = 'en_cours' AND echeance IS NOT NULL AND echeance < ?
 `);
 
 // ordre = nombre de coups déjà joués + 1
@@ -78,16 +87,16 @@ function trouverPartieParCode(code) {
 }
 
 // Retourne false si la partie n'était plus en attente.
-function demarrerPartie({ id, blancId, noirId }) {
-  return updateDemarrer.run(blancId, noirId, id).changes === 1;
+function demarrerPartie({ id, blancId, noirId, echeance = null, tempsBlanc = null, tempsNoir = null }) {
+  return updateDemarrer.run(blancId, noirId, echeance, tempsBlanc, tempsNoir, id).changes === 1;
 }
 
 // La nouvelle FEN et le coup sont enregistrés ensemble ou pas du tout.
 // Retourne false si la position a changé entre-temps (rien n'est enregistré).
-function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup }) {
+function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup, echeance = null, tempsBlanc = null, tempsNoir = null }) {
   db.exec('BEGIN');
   try {
-    if (updateFen.run(nouvelleFen, id, ancienneFen).changes !== 1) {
+    if (updateFen.run(nouvelleFen, echeance, tempsBlanc, tempsNoir, id, ancienneFen).changes !== 1) {
       db.exec('ROLLBACK');
       return false;
     }
@@ -103,17 +112,20 @@ function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup }) {
 // Fin de partie : le dernier coup (s'il y en a un), la position, le statut, le résultat,
 // la cause et les deux nouveaux Elo sont enregistrés ensemble ou pas du tout.
 // resultat : 'blanc', 'noir' ou 'nulle'.
-// cause : 'mat', 'abandon', ou pour une nulle 'pat', 'materiel_insuffisant', 'repetition', 'cinquante_coups'.
-// Sans coup (abandon), ancienneFen, nouvelleFen et coup sont absents.
+// cause : 'mat', 'abandon', 'temps' (quotidien), ou pour une nulle 'pat', 'materiel_insuffisant',
+// 'repetition', 'cinquante_coups'. Une nulle au temps (gagnant sans matériel pour mater) garde 'temps'.
+// Sans coup (abandon, temps), ancienneFen, nouvelleFen, coup et la pendule sont absents.
 // Retourne false si la partie n'était plus en cours (rien n'est enregistré).
 function enregistrerFinDePartie({
   id, ancienneFen = null, nouvelleFen = null, coup, resultat, cause,
+  echeance = null, tempsBlanc = null, tempsNoir = null,
   blancId, noirId, eloBlancAvant, eloBlancApres, eloNoirAvant, eloNoirApres,
 }) {
   db.exec('BEGIN');
   try {
     const modifie = updateTerminer.run(
       nouvelleFen, resultat, cause,
+      echeance, tempsBlanc, tempsNoir,
       eloBlancAvant, eloBlancApres, eloNoirAvant, eloNoirApres,
       id, ancienneFen,
     ).changes;
@@ -140,6 +152,10 @@ function listerCoups(partieId) {
   return selectCoups.all(partieId).map((ligne) => ligne.coup);
 }
 
+function listerPartiesEnRetard(maintenantIso) {
+  return selectEnRetard.all(maintenantIso);
+}
+
 module.exports = {
   insererPartie,
   trouverPartieParId,
@@ -149,4 +165,5 @@ module.exports = {
   enregistrerFinDePartie,
   listerCoups,
   listerPartiesTerminees,
+  listerPartiesEnRetard,
 };

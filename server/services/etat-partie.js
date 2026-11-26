@@ -1,6 +1,7 @@
 const { listerCoups } = require('../repository/parties.js');
 const { trouverJoueurParId } = require('../repository/joueurs.js');
 const { trouverCadence } = require('./cadences.js');
+const { penduleRestante } = require('./pendule.js');
 
 // L'état complet d'une partie, vu par joueurId (null pour un anonyme ou un spectateur).
 // Utilisé par HTTP (GET /api/parties/:id) et par Socket.IO : les deux envoient le même objet.
@@ -26,6 +27,9 @@ function etatPartie(partie, joueurId) {
     coups: listerCoups(id),
     fin: finPublique(partie),
     cadence: trouverCadence(partie.cadence),
+    // instant où le joueur au trait perd au temps (texte ISO), null en salle d'attente
+    echeance: partie.echeance,
+    pendule: penduleRestante(partie),
   };
 }
 

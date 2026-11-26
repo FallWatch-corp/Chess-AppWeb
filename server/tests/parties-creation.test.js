@@ -75,6 +75,8 @@ test('GET /api/parties/:id renvoie la partie à son créateur', async () => {
     noir: null,
     coups: [],
     fin: null,
+    echeance: null,
+    pendule: null, // pas de pendule en salle d'attente
   });
 });
 

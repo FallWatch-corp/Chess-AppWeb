@@ -8,6 +8,7 @@ const {
 const { ErreurApi } = require('./erreur-api.js');
 const { trouverCadence } = require('./cadences.js');
 const { trouverJoueurParId } = require('../repository/joueurs.js');
+const { penduleAuDepart } = require('./pendule.js');
 
 // On a enlevé 0, O, 1, I et L parce qu'on les confond facilement.
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -66,7 +67,7 @@ function rejoindrePartie(joueurId, code, createurEstBlanc = pileOuFace) {
     : [joueurId, partie.createur];
 
   // Quelqu'un d'autre a pu rejoindre juste avant nous
-  if (!demarrerPartie({ id: partie.id, blancId, noirId })) {
+  if (!demarrerPartie({ id: partie.id, blancId, noirId, ...penduleAuDepart(partie.cadence) })) {
     throw new ErreurApi(409, 'Ce code a déjà été utilisé.');
   }
 

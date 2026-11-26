@@ -7,6 +7,7 @@ export const CAUSES: Record<string, string> = {
   repetition: "par répétition",
   materiel_insuffisant: "par matériel insuffisant",
   cinquante_coups: "par la règle des 50 coups",
+  temps: "au temps",
 };
 
 export function formaterVariation(variation: number) {
