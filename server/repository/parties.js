@@ -33,9 +33,11 @@ const updateFen = db.prepare(`
 
 // Pour un abandon, les deux FEN valent null : la position ne change pas
 // et on ne vérifie pas qu'elle est restée la même (l'abandon vaut quelle que soit la position).
+// De même, sans coup (abandon, temps), la pendule garde ses valeurs ; un coup qui termine la partie l'enregistre.
 const updateTerminer = db.prepare(`
   UPDATE parties
   SET fen = COALESCE(?, fen), statut = 'terminee', resultat = ?, cause = ?,
+      echeance = COALESCE(?, echeance), temps_blanc = COALESCE(?, temps_blanc), temps_noir = COALESCE(?, temps_noir),
       elo_blanc_avant = ?, elo_blanc_apres = ?,
       elo_noir_avant = ?, elo_noir_apres = ?,
       terminee_le = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
@@ -112,16 +114,18 @@ function enregistrerCoup({ id, ancienneFen, nouvelleFen, coup, echeance = null, 
 // resultat : 'blanc', 'noir' ou 'nulle'.
 // cause : 'mat', 'abandon', 'temps' (quotidien), ou pour une nulle 'pat', 'materiel_insuffisant',
 // 'repetition', 'cinquante_coups'. Une nulle au temps (gagnant sans matériel pour mater) garde 'temps'.
-// Sans coup (abandon), ancienneFen, nouvelleFen et coup sont absents.
+// Sans coup (abandon, temps), ancienneFen, nouvelleFen, coup et la pendule sont absents.
 // Retourne false si la partie n'était plus en cours (rien n'est enregistré).
 function enregistrerFinDePartie({
   id, ancienneFen = null, nouvelleFen = null, coup, resultat, cause,
+  echeance = null, tempsBlanc = null, tempsNoir = null,
   blancId, noirId, eloBlancAvant, eloBlancApres, eloNoirAvant, eloNoirApres,
 }) {
   db.exec('BEGIN');
   try {
     const modifie = updateTerminer.run(
       nouvelleFen, resultat, cause,
+      echeance, tempsBlanc, tempsNoir,
       eloBlancAvant, eloBlancApres, eloNoirAvant, eloNoirApres,
       id, ancienneFen,
     ).changes;
