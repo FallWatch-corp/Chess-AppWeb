@@ -40,9 +40,9 @@ La connexion passe par GitHub. Il faut déclarer une application OAuth une fois 
    | --- | --- |
    | Application name | ce que tu veux, par exemple `Chess-AppWeb dev` |
    | Homepage URL | `http://localhost:5173` |
-   | Authorization callback URL | `http://localhost:3000/api/auth/callback` |
+   | Redirect URI | `http://localhost:3000/api/auth/callback` |
 
-   L'URL de callback doit être **exactement** celle-ci : c'est l'adresse de l'API (`URL_API`) suivie de `/api/auth/callback`. Sinon, GitHub refuse la connexion.
+  Le champ **Redirect URI** doit contenir **exactement** cette valeur : c'est l'adresse de l'API (`URL_API`) suivie de `/api/auth/callback`. Sinon, GitHub refuse la connexion.
 3. Sur la page de l'application créée, copie le **Client ID**, puis clique **Generate a new client secret** et copie-le tout de suite : GitHub ne l'affiche qu'une fois.
 
 ### 3. Configurer les variables d'environnement
@@ -115,7 +115,7 @@ Le site et l'API sont alors aux mêmes adresses qu'avec `npm run dev`. La base e
 | L'API s'arrête avec « Variables d'environnement manquantes » | `server/.env` absent, vide ou pas enregistré |
 | Erreur 500 « fetch failed » sur le site | L'API ne tourne pas : regarde les lignes `[server]` dans le terminal |
 | Page 404 chez GitHub en cliquant « Se connecter » | `GITHUB_CLIENT_ID` invalide (resté à la valeur d'exemple, par exemple) |
-| GitHub affiche une erreur `redirect_uri` | L'URL de callback de l'application OAuth ne correspond pas à `URL_API` + `/api/auth/callback` |
+| GitHub affiche une erreur `redirect_uri` | Le champ Redirect URI de l'application OAuth ne correspond pas à `URL_API` + `/api/auth/callback` |
 | Une modification de `server/.env` n'est pas prise en compte | Le fichier n'est lu qu'au démarrage : relance `npm run dev` |
 
 ---
@@ -195,7 +195,7 @@ cp .env.example .env
 Crée une **application OAuth distincte** pour le déploiement (voir [l'étape 2 du développement](#2-créer-lapplication-github-oauth)), avec :
 
 - Homepage URL : la valeur de `URL_CLIENT` ;
-- Authorization callback URL : la valeur de `URL_API` suivie de `/api/auth/callback`.
+- Redirect URI : la valeur de `URL_API` suivie de `/api/auth/callback`.
 
 ### 3. Démarrer
 
@@ -224,8 +224,6 @@ docker compose down -v        # arrête ET supprime la base (volume donnees_sqli
 ```
 
 La base SQLite est dans le volume nommé `donnees_sqlite`, monté sur `/data` dans le conteneur de l'API. Elle survit à `docker compose down` et aux mises à jour. Seul `down -v` l'efface.
-
-> **À savoir :** dans `deploy/compose.yml`, le service `client` ne reçoit pas encore `URL_API`. Le bouton « Se connecter avec GitHub » utilise donc l'adresse par défaut `http://localhost:3000`. Ça fonctionne quand le site est ouvert sur la machine de déploiement elle-même (le cas avec les valeurs de l'exemple). Pour un accès depuis une autre machine, il faudra ajouter `URL_API: ${URL_API}` à l'`environment` du service `client`.
 
 ---
 
