@@ -78,14 +78,27 @@ test('peutMater : non avec le roi seul ou avec un seul fou ou cavalier, oui sino
   }
 });
 
-test('en quotidien, l\'échéance est posée à 24 h quand l\'adversaire rejoint ; aucune dans les autres cadences', () => {
+test('en quotidien, l\'échéance est posée à 24 h quand l\'adversaire rejoint, sans pendule', () => {
   const avant = Date.now();
-  const quotidienne = nouvellePartie();
+  const { id } = nouvellePartie();
   const apres = Date.now();
-  const directe = nouvellePartie('3+2');
 
-  assertDans24h(enBase(quotidienne.id).echeance, avant, apres);
-  assert.equal(enBase(directe.id).echeance, null);
+  const partie = db.prepare('SELECT echeance, temps_blanc, temps_noir FROM parties WHERE id = ?').get(id);
+  assertDans24h(partie.echeance, avant, apres);
+  assert.equal(partie.temps_blanc, null);
+  assert.equal(partie.temps_noir, null);
+});
+
+test('en 3+2, chaque joueur reçoit 3 min quand l\'adversaire rejoint, et les blancs ont jusqu\'à dans 3 min', () => {
+  const avant = Date.now();
+  const { id } = nouvellePartie('3+2');
+  const apres = Date.now();
+
+  const partie = db.prepare('SELECT echeance, temps_blanc, temps_noir FROM parties WHERE id = ?').get(id);
+  assert.equal(partie.temps_blanc, 180000);
+  assert.equal(partie.temps_noir, 180000);
+  const ms = Date.parse(partie.echeance);
+  assert.ok(ms >= avant + 180000 && ms <= apres + 180000, partie.echeance);
 });
 
 test('l\'échéance est envoyée au client', async () => {

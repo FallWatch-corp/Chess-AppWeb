@@ -27,8 +27,8 @@ const port = process.env.PORT || 3000;
 const serveurHttp = http.createServer(app);
 brancherTempsReel(serveurHttp);
 
-// Termine au temps les parties quotidiennes en retard et prévient leurs joueurs.
-// Une erreur ici ne doit pas arrêter le serveur : on la note et on réessaiera à la minute suivante.
+// Termine au temps les parties en retard et prévient leurs joueurs.
+// Une erreur ici ne doit pas arrêter le serveur : on la note et on réessaiera à la vérification suivante.
 function terminerLesRetards() {
   try {
     for (const id of verifierEcheances()) {
@@ -40,7 +40,7 @@ function terminerLesRetards() {
 }
 
 terminerLesRetards(); // au démarrage : des parties ont pu expirer pendant que le serveur était arrêté
-setInterval(terminerLesRetards, 60 * 1000); // puis toutes les minutes
+setInterval(terminerLesRetards, 1000); // puis chaque seconde : en blitz, une seconde de retard se voit
 
 serveurHttp.listen(port, () => {
   console.log(`API à l'écoute sur le port ${port}`);

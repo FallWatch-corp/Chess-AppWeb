@@ -20,5 +20,10 @@ for (const colonne of ['cause', 'terminee_le', 'echeance']) {
 if (!colonnesParties.includes('cadence')) {
   db.exec(`ALTER TABLE parties ADD COLUMN cadence TEXT NOT NULL DEFAULT '10+0'`);
 }
+for(const colonne of ['temps_blanc', 'temps_noir']) {
+  if (!colonnesParties.includes(colonne)) {
+    db.exec(`ALTER TABLE parties ADD COLUMN ${colonne} INTEGER`);
+  }
+}
 
 module.exports = db;

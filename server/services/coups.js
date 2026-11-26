@@ -2,7 +2,7 @@ const { Chess } = require('chess.js');
 const { trouverPartieParId, enregistrerCoup, listerCoups } = require('../repository/parties.js');
 const { terminerPartie } = require('./fin-partie.js');
 const { ErreurApi } = require('./erreur-api.js');
-const { prochaineEcheance } = require('./cadences.js');
+const { penduleApresCoup } = require('./pendule.js');
 
 const CASE = /^[a-h][1-8]$/;
 const PROMOTIONS = ['q', 'r', 'b', 'n'];
@@ -75,7 +75,7 @@ function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}, maintenant 
     ancienneFen: partie.fen,
     nouvelleFen: echecs.fen(),
     coup: coup.san,
-    echeance: prochaineEcheance(partie.cadence),
+    ...penduleApresCoup(partie, maintenant),
   };
 
   // Après le coup, chess.js dit si la partie est finie.
