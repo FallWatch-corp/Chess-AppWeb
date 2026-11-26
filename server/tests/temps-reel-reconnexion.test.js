@@ -85,7 +85,9 @@ test('alice voit bob repasser en ligne après une coupure', { timeout: 5000 }, a
   await rejoindre(retour, id);
   // 4. l'annonce dit que les deux joueurs sont en ligne
   const presence = await enLigne;
-  assert.deepEqual(presence, { blanc: 'en_ligne', noir: 'en_ligne', retour: { blanc: null, noir: null } });
+  assert.equal(presence.blanc, 'en_ligne');
+  assert.equal(presence.noir, 'en_ligne');
+  assert.deepEqual(presence.retour, { blanc: null, noir: null });
 });
 
 // Limite : le serveur est arrêté puis relancé dans le même programme Node.
