@@ -112,7 +112,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
       <Form method="post" className="flex flex-col gap-3">
         <input type="hidden" name="intent" value="creer" />
         {Object.entries(categoriesCadences).map(([categorie, libelle]) => (
-          <fieldset key={categorie} className="flex items-center gap-2">
+          <fieldset key={categorie} className="flex flex-wrap items-center gap-2">
             <legend className="mb-1 text-sm text-gray-500">{libelle}</legend>
             {cadences
               .filter((c) => c.categorie === categorie)
