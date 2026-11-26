@@ -29,7 +29,9 @@ type Partie = {
   coups: string[];
   fin: Fin | null;
   cadence: Cadence;
-  echeance: string | null; // date limite du prochain coup en quotidien (texte ISO), null sinon
+  echeance: string | null; // instant où le joueur au trait perd au temps (texte ISO), null en salle d'attente
+  // temps restant de chaque joueur en millisecondes, mesuré à l'envoi ; null en salle d'attente et en quotidien
+  pendule: { blanc: number; noir: number } | null;
 };
 
 type EloPartie = { avant: number; apres: number };
@@ -208,7 +210,10 @@ function PartieEnCours({
       ) : (
         <p className="text-lg font-medium">{messageTrait}</p>
       )}
-      {enCours && partie.echeance && <TempsPourJouer echeance={partie.echeance} />}
+      {/* toutes les cadences ont une échéance, mais seul le quotidien l'affiche ainsi ; les autres ont la pendule */}
+      {enCours && partie.cadence.categorie === "quotidien" && partie.echeance && (
+        <TempsPourJouer echeance={partie.echeance} />
+      )}
       <p className="text-sm text-gray-500">{libelleCadence(partie.cadence)}</p>
       {!partie.couleur && <p className="text-sm text-gray-500">Vous regardez cette partie en spectateur.</p>}
       <BandeauJoueur
@@ -218,6 +223,7 @@ function PartieEnCours({
         materiel={materiel[adversaire]}
         enLigne={presence ? presence[adversaire] === "en_ligne" : undefined}
         echeance={enCours ? presence?.echeances[adversaire] : null}
+        pendule={partie.pendule?.[adversaire]}
       />
       <Echiquier
         fen={fen}
@@ -232,6 +238,7 @@ function PartieEnCours({
         materiel={materiel[moi]}
         enLigne={presence && !partie.couleur ? presence[moi] === "en_ligne" : undefined}
         echeance={enCours && !partie.couleur ? presence?.echeances[moi] : null}
+        pendule={partie.pendule?.[moi]}
       />
       {enCours && partie.couleur && (
         <button
@@ -296,6 +303,7 @@ function BandeauJoueur({
   materiel,
   enLigne,
   echeance,
+  pendule,
 }: {
   joueur: JoueurPartie | null;
   couleur: Couleur;
@@ -303,6 +311,7 @@ function BandeauJoueur({
   materiel: Materiel;
   enLigne?: boolean;
   echeance?: number | null;
+  pendule?: number;
 }) {
   return (
     <div className="flex w-full max-w-140 items-center justify-between">
@@ -330,7 +339,10 @@ function BandeauJoueur({
         {enLigne === false && echeance && <CompteARebours echeance={echeance} />}
         <PiecesPrises prises={materiel.prises} avantage={materiel.avantage} />
       </div>
-      {trait === couleur && <span className="text-sm text-gray-500">au trait</span>}
+      <div className="flex items-center gap-3">
+        {trait === couleur && <span className="text-sm text-gray-500">au trait</span>}
+        {pendule !== undefined && <Pendule restant={pendule} tourne={trait === couleur} couleur={couleur} />}
+      </div>
     </div>
   );
 }
@@ -375,6 +387,45 @@ function CompteARebours({ echeance }: { echeance: number }) {
   return (
     <span role="timer" className="text-sm text-red-600">
       Déconnecté : <span className="font-mono">{affichage}</span> pour revenir, sinon défaite par abandon
+    </span>
+  );
+}
+
+// La pendule d'un joueur. restant est le temps mesuré par le serveur à l'envoi de l'état :
+// on enlève le temps écoulé depuis sa réception, mesuré avec l'horloge locale. Une horloge
+// décalée ne fausse donc rien, car seule la durée compte. Le premier rendu affiche restant tel quel,
+// le même côté serveur et navigateur : pas d'erreur d'hydratation.
+function Pendule({ restant, tourne, couleur }: { restant: number; tourne: boolean; couleur: Couleur }) {
+  const [ecoule, setEcoule] = useState(0);
+
+  // À chaque nouvel état (un coup, un retour sur la page), on repart de la nouvelle mesure.
+  useEffect(() => {
+    setEcoule(0);
+    if (!tourne) return;
+    const recuLe = Date.now();
+    const minuterie = setInterval(() => setEcoule(Date.now() - recuLe), 100);
+    return () => clearInterval(minuterie);
+  }, [restant, tourne]);
+
+  const ms = Math.max(0, restant - (tourne ? ecoule : 0));
+  // Arrondi vers le bas : une pendule n'affiche jamais plus que ce qui reste.
+  const secondes = Math.floor(ms / 1000);
+  const mmss = `${Math.floor(secondes / 60)}:${String(secondes % 60).padStart(2, "0")}`;
+  // sous 10 s, les dixièmes, pour voir la fin arriver
+  const affichage = ms < 10_000 ? `${mmss}.${Math.floor((ms % 1000) / 100)}` : mmss;
+
+  const couleurs = !tourne
+    ? "bg-gray-100 text-gray-500"
+    : ms < 20_000
+      ? "bg-red-600 text-white"
+      : "bg-gray-900 text-white";
+  return (
+    <span
+      role="timer"
+      aria-label={`Pendule des ${couleur === "blanc" ? "blancs" : "noirs"}`}
+      className={`rounded px-3 py-1 font-mono text-xl tabular-nums ${couleurs}`}
+    >
+      {affichage}
     </span>
   );
 }
