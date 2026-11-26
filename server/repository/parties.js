@@ -58,7 +58,7 @@ const selectTerminees = db.prepare(`
 
 // Les parties d'un joueur qui ne sont pas terminées (en attente d'un adversaire ou en cours).
 const selectEnCours = db.prepare(`
-  SELECT id, code, statut, cadence
+  SELECT id, statut
   FROM parties
   WHERE statut IN ('en_attente', 'en_cours') AND (createur = ? OR blanc = ? OR noir = ?)
   ORDER BY id DESC
