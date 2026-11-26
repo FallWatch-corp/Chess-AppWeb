@@ -1,8 +1,10 @@
-import { Form, redirect, useNavigation, useRouteLoaderData } from "react-router";
+import { Form, Link, redirect, useNavigation, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { loader as rootLoader } from "../root";
 import { appelerApi } from "../api.server";
 import { categoriesCadences, formaterCadence, libelleCadence, type Cadence } from "../cadence";
+
+type PartieEnCours = { id: number; statut: "en_attente" | "en_cours" };
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Chess-AppWeb" }];
@@ -65,13 +67,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     throw new Response("Le serveur ne répond pas correctement.", { status: 502 });
   }
   const cadences: Cadence[] = await reponse.json();
-  return { cadences };
+
+  // Mes parties à reprendre. Sans session, l'API répond 401 : on n'affiche alors rien.
+  const reponseParties = await appelerApi(request, "/api/parties/en-cours");
+  const parties: PartieEnCours[] = reponseParties.ok ? await reponseParties.json() : [];
+
+  return { cadences, parties };
 }
 
 export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   const racine = useRouteLoaderData<typeof rootLoader>("root");
   const enCours = useNavigation().state !== "idle";
-  const { cadences } = loaderData;
+  const { cadences, parties } = loaderData;
 
   if (!racine?.joueur) {
     return (
@@ -85,7 +92,23 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   return (
     <main className="container mx-auto flex flex-col items-center gap-6 p-8">
       <h1 className="text-2xl font-semibold">Jouer une partie privée</h1>
-
+      {parties.length > 0 && (
+        <section className="flex flex-col items-center gap-2">
+          <h2 className="text-lg font-semibold">Mes parties à reprendre</h2>
+          <ul className="flex flex-col gap-1">
+            {parties.map((partie) => (
+              <li key={partie.id}>
+                <Link to={`/parties/${partie.id}`} className="text-blue-600 underline dark:text-blue-400">
+                  Reprendre ma partie en cours
+                </Link>{" "}
+                <span className="text-sm text-gray-500">
+                  ({partie.statut === "en_attente" ? "en attente d'un adversaire" : "en cours"})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <Form method="post" className="flex flex-col gap-3">
         <input type="hidden" name="intent" value="creer" />
         {Object.entries(categoriesCadences).map(([categorie, libelle]) => (
