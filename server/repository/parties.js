@@ -56,6 +56,14 @@ const selectTerminees = db.prepare(`
   ORDER BY p.terminee_le DESC, p.id DESC
 `);
 
+// Les parties d'un joueur qui ne sont pas terminées (en attente d'un adversaire ou en cours).
+const selectEnCours = db.prepare(`
+  SELECT id, code, statut, cadence
+  FROM parties
+  WHERE statut IN ('en_attente', 'en_cours') AND (createur = ? OR blanc = ? OR noir = ?)
+  ORDER BY id DESC
+`);
+
 // ordre = nombre de coups déjà joués + 1
 const insertCoup = db.prepare(`
   INSERT INTO coups (partie, ordre, coup)
@@ -136,6 +144,10 @@ function listerPartiesTerminees(joueurId) {
   return selectTerminees.all(joueurId, joueurId);
 }
 
+function listerPartiesEnCours(joueurId) {
+  return selectEnCours.all(joueurId, joueurId, joueurId);
+}
+
 function listerCoups(partieId) {
   return selectCoups.all(partieId).map((ligne) => ligne.coup);
 }
@@ -149,4 +161,5 @@ module.exports = {
   enregistrerFinDePartie,
   listerCoups,
   listerPartiesTerminees,
+  listerPartiesEnCours,
 };
