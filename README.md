@@ -225,8 +225,6 @@ docker compose down -v        # arrête ET supprime la base (volume donnees_sqli
 
 La base SQLite est dans le volume nommé `donnees_sqlite`, monté sur `/data` dans le conteneur de l'API. Elle survit à `docker compose down` et aux mises à jour. Seul `down -v` l'efface.
 
-> **À savoir :** dans `deploy/compose.yml`, le service `client` ne reçoit pas encore `URL_API`. Le bouton « Se connecter avec GitHub » utilise donc l'adresse par défaut `http://localhost:3000`. Ça fonctionne quand le site est ouvert sur la machine de déploiement elle-même (le cas avec les valeurs de l'exemple). Pour un accès depuis une autre machine, il faudra ajouter `URL_API: ${URL_API}` à l'`environment` du service `client`.
-
 ---
 
 ## Règles des échecs : chess.js
