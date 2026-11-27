@@ -1,7 +1,7 @@
 const express = require('express');
 const { randomBytes } = require('node:crypto');
 const { trouverOuCreerJoueur } = require('../repository/joueurs.js');
-const { writeSession, clearSession, readCookie } = require('../session.js');
+const { writeSession, clearSession, readCookie, estEnProduction } = require('../session.js');
 
 const router = express.Router();
 
@@ -21,7 +21,7 @@ router.get('/login', (req, res) => {
   // le state c'est une valeur au hasard qu'on garde dans un cookie et que GitHub
   // nous renvoie. Si ça ne correspond pas, quelqu'un a essayé de nous piéger (CSRF).
   const state = randomBytes(16).toString('hex');
-  res.cookie(COOKIE_STATE, state, { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/' });
+  res.cookie(COOKIE_STATE, state, { httpOnly: true, sameSite: 'lax', secure: estEnProduction(), maxAge: 10 * 60 * 1000, path: '/' });
 
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_CLIENT_ID,
@@ -35,7 +35,7 @@ router.get('/login', (req, res) => {
 router.get('/callback', async (req, res) => {
   const { code, state, error } = req.query;
   const stateAttendu = readCookie(req, COOKIE_STATE);
-  res.clearCookie(COOKIE_STATE, { path: '/' });
+  res.clearCookie(COOKIE_STATE, { secure: estEnProduction(), path: '/' });
 
   // error = le joueur a cliqué Annuler chez GitHub
   if (error || !code || !state || state !== stateAttendu) {
