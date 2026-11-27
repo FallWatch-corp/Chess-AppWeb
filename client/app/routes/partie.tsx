@@ -322,7 +322,7 @@ function BandeauJoueur({
           <span className="font-semibold">{joueur?.nom ?? "?"}</span>
           <span className="font-mono text-gray-500">({joueur?.elo ?? "?"})</span>
           {enLigne !== undefined && (
-            <span className="flex items-center gap-1 text-sm text-gray-500">
+            <span role="status" className="flex items-center gap-1 text-sm text-gray-500">
               <span
                 aria-hidden
                 className={`inline-block size-2 rounded-full ${enLigne ? "bg-green-500" : "bg-gray-400"}`}
