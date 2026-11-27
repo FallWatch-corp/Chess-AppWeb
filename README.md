@@ -354,6 +354,12 @@ Un joueur qui se déconnecte en pleine partie a 60 secondes pour revenir. Sinon,
 - **Le navigateur ne fait qu'afficher.** Le serveur envoie le temps restant en millisecondes (et pas une heure), ce qui évite les écarts entre l'horloge du serveur et celle du navigateur. Le client en déduit une échéance locale et affiche le compte à rebours à côté du joueur déconnecté. Il ne termine jamais la partie lui-même : la fin arrive par `partie:etat`.
 - La variable `DELAI_RETOUR_MS` (optionnelle, 60000 par défaut) change la durée. Les tests la mettent à 300 ms.
 
+### Reprendre une partie sur un autre appareil
+
+La partie est liée au **compte** du joueur, pas au navigateur : en se connectant avec le même compte GitHub sur son téléphone, il retrouve sa couleur et peut jouer. Le serveur reconnaît le joueur grâce au cookie de session. La présence se calcule **par joueur** (toutes ses connexions), donc passer de l'ordinateur au téléphone dans les 60 secondes annule le délai de retour.
+
+`GET /api/parties/en-cours` (connexion obligatoire) renvoie les parties du joueur qui ne sont pas terminées, la plus récente d'abord : `[{ "id": 12, "statut": "en_cours" }]`. Le statut vaut `en_attente` (l'adversaire n'est pas encore arrivé) ou `en_cours`. L'accueil s'en sert pour afficher « Reprendre ma partie en cours », un lien direct vers `/parties/:id`. La route est déclarée **avant** `/:id` dans `server/routes/parties.js` : sinon `/:id` la prendrait pour un numéro de partie.
+
 ### L'identité d'une connexion
 
 - La connexion est authentifiée **une seule fois, à son ouverture**, par le cookie de session (`server/temps-reel/authentification.js`). C'est le seul moment où le cookie voyage : il est dans les en-têtes de la requête HTTP d'ouverture, pas dans les messages.
