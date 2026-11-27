@@ -308,6 +308,16 @@ function BandeauJoueur({
   enLigne?: boolean;
   echeance?: number | null;
 }) {
+  const avant = useRef(enLigne);
+  const [revenu, setRevenu] = useState(false);
+  useEffect(() => {
+    const etaitHorsLigne = avant.current === false;
+    avant.current = enLigne;
+    if (!etaitHorsLigne || !enLigne) return;
+    setRevenu(true);
+    const minuterie = setTimeout(() => setRevenu(false), 4000);
+    return () => clearTimeout(minuterie);
+  }, [enLigne]);
   return (
     <div className="flex w-full max-w-140 items-center justify-between">
       <div className="flex flex-col gap-1">
@@ -322,12 +332,12 @@ function BandeauJoueur({
           <span className="font-semibold">{joueur?.nom ?? "?"}</span>
           <span className="font-mono text-gray-500">({joueur?.elo ?? "?"})</span>
           {enLigne !== undefined && (
-            <span className="flex items-center gap-1 text-sm text-gray-500">
+            <span role="status" className="flex items-center gap-1 text-sm text-gray-500">
               <span
                 aria-hidden
                 className={`inline-block size-2 rounded-full ${enLigne ? "bg-green-500" : "bg-gray-400"}`}
               />
-              {enLigne ? "en ligne" : "hors ligne"}
+              {enLigne ? (revenu ? "reconnecté" : "en ligne") : "hors ligne"}
             </span>
           )}
         </span>
