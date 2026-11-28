@@ -225,7 +225,34 @@ docker compose down -v        # arrête ET supprime la base (volume donnees_sqli
 
 La base SQLite est dans le volume nommé `donnees_sqlite`, monté sur `/data` dans le conteneur de l'API. Elle survit à `docker compose down` et aux mises à jour. Seul `down -v` l'efface.
 
-> **À savoir :** dans `deploy/compose.yml`, le service `client` ne reçoit pas encore `URL_API`. Le bouton « Se connecter avec GitHub » utilise donc l'adresse par défaut `http://localhost:3000`. Ça fonctionne quand le site est ouvert sur la machine de déploiement elle-même (le cas avec les valeurs de l'exemple). Pour un accès depuis une autre machine, il faudra ajouter `URL_API: ${URL_API}` à l'`environment` du service `client`.
+### 5. Déploiement public avec HTTPS
+
+Pour ouvrir l'application sur Internet, on démarre en plus **Caddy**, un mandataire inverse : il reçoit le trafic sur les ports 80 et 443, obtient tout seul un certificat HTTPS (Let's Encrypt) et redirige les requêtes :
+
+- `/api/*` et `/socket.io/*` (le WebSocket compris) vers l'API ;
+- tout le reste vers le client.
+
+Caddy fait partie du profil `public` de `deploy/compose.yml`. Sans cette option, `docker compose up` démarre comme avant (ports 3000 et 5173).
+
+Dans `deploy/.env`, remplace les valeurs locales par les valeurs publiques (elles sont aussi en commentaire dans `deploy/.env.example`) :
+
+| Variable | Valeur publique |
+| --- | --- |
+| `DOMAIN` | le nom DNS de la machine, par exemple `fallwatch-chess.eastus2.cloudapp.azure.com` |
+| `NODE_ENV` | `production` : les cookies ne voyagent qu'en HTTPS (attribut `Secure`) |
+| `URL_API` | `https://` suivi de la valeur de `DOMAIN` |
+| `URL_CLIENT` | `https://` suivi de la valeur de `DOMAIN` |
+
+L'application OAuth GitHub **de production** suit la même règle qu'à l'étape 2 : avec ces valeurs, le callback est `URL_API` suivi de `/api/auth/callback`.
+
+Les ports 80 et 443 doivent être ouverts sur la machine. Ensuite, depuis `deploy/` :
+
+```bash
+docker compose --profile public up -d     # démarre l'API, le client et Caddy
+docker compose --profile public down      # arrête tout, Caddy compris
+```
+
+Caddy garde ses certificats dans le volume `caddy_data` : ils survivent à `down`, mais pas à `down -v`. Évite de supprimer ce volume à répétition, car Let's Encrypt limite le nombre de certificats délivrés pour un même nom.
 
 ---
 

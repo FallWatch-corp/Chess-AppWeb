@@ -133,3 +133,25 @@ test('les routes protégées répondent 401 sans session', async () => {
   assert.equal(moi.status, 401);
   assert.equal(creer.status, 401);
 });
+
+test('en production, le cookie oauth_state est Secure', async () => {
+  process.env.NODE_ENV = 'production';
+  try {
+    const reponse = await request(app).get('/api/auth/login');
+
+    assert.match(reponse.headers['set-cookie'].join(), /Secure/);
+  } finally {
+    delete process.env.NODE_ENV;
+  }
+});
+
+test('hors production, le cookie oauth_state est sans Secure', async () => {
+  process.env.NODE_ENV = 'development';
+  try {
+    const reponse = await request(app).get('/api/auth/login');
+
+    assert.doesNotMatch(reponse.headers['set-cookie'].join(), /Secure/);
+  } finally {
+    delete process.env.NODE_ENV;
+  }
+});

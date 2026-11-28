@@ -1,6 +1,12 @@
 const { createHmac, timingSafeEqual } = require('node:crypto');
 
 const COOKIE_NAME = 'chess_session';
+
+// Le cookie ne voyage qu'en HTTPS quand l'app est déployée (NODE_ENV=production).
+function estEnProduction() {
+  return process.env.NODE_ENV === 'production';
+}
+
 const DUREE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function signSession(session) {
@@ -43,13 +49,13 @@ function readSession(req) {
 }
 
 function writeSession(res, session) {
-  res.cookie(COOKIE_NAME, signSession(session), { httpOnly: true, sameSite: 'lax', maxAge: DUREE_MS, path: '/' });
+  res.cookie(COOKIE_NAME, signSession(session), { httpOnly: true, sameSite: 'lax', secure: estEnProduction(), maxAge: DUREE_MS, path: '/' });
 }
 
 // ponytail: la session vit seulement dans le cookie, donc un cookie copié avant la déconnexion
 // reste valide jusqu'à son exp. Il faudrait une liste de sessions révoquées en base si ça devient un problème.
 function clearSession(res) {
-  res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: 'lax', path: '/' });
+  res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: 'lax', secure: estEnProduction(), path: '/' });
 }
 
-module.exports = { readSession, writeSession, clearSession, readCookie, COOKIE_NAME };
+module.exports = { readSession, writeSession, clearSession, readCookie, COOKIE_NAME, estEnProduction };

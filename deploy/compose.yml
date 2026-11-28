@@ -11,6 +11,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET}
       URL_API: ${URL_API}
       URL_CLIENT: ${URL_CLIENT}
+      NODE_ENV: ${NODE_ENV:-development}
 
   client:
     image: ghcr.io/${COMPTE}/chess-appweb-client:${TAG}
@@ -24,5 +25,22 @@ services:
     depends_on:
       - server
 
+  caddy:
+    image: caddy:2
+    profiles: ["public"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - server
+      - client
+
 volumes:
   donnees_sqlite:
+  caddy_data:
