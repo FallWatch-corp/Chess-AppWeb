@@ -4,11 +4,16 @@ const { creerPartie, rejoindrePartie, apercuPartie } = require('../services/part
 const { jouerCoup } = require('../services/coups.js');
 const { abandonner } = require('../services/fin-partie.js');
 const { etatPartie } = require('../services/etat-partie.js');
-const { trouverPartieParId, listerPartiesTerminees } = require('../repository/parties.js');
+const { trouverPartieParId, listerPartiesTerminees, listerPartiesEnCours } = require('../repository/parties.js');
 const { diffuserPartie } = require('../temps-reel/diffusion.js');
 const { trouverCadence } = require('../services/cadences.js');
 
 const router = express.Router();
+
+// Mes parties pas encore terminées (en attente ou en cours), pour le lien « Reprendre ma partie ».
+router.get('/en-cours', exigerConnexion, (req, res) => {
+  res.json(listerPartiesEnCours(req.joueur.id));
+});
 
 // Public : n'importe qui (même sans compte) peut suivre une partie avec son lien.
 // Pas d'exigerConnexion : un non-joueur ou un anonyme la reçoit en spectateur.
