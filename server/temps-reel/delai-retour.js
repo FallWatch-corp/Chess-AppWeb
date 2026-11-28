@@ -44,9 +44,11 @@ function expirer(partieId, joueurId, quandExpire) {
 }
 
 function synchroniserDelais(partie, presence, quandExpire) {
+  // En quotidien, fermer la page est normal : seule l'échéance de 24 h compte (#66).
+  const quotidienne = partie.cadence === 'quotidien';
   for (const couleur of ['blanc', 'noir']) {
     const joueurId = partie[couleur];
-    if (partie.statut === 'en_cours' && joueurId && presence[couleur] === 'hors_ligne') {
+    if (!quotidienne && partie.statut === 'en_cours' && joueurId && presence[couleur] === 'hors_ligne') {
       demarrerDelai(partie.id, couleur, joueurId, quandExpire);
     } else {
       annulerDelai(partie.id, couleur);

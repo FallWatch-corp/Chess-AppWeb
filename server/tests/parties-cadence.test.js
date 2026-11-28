@@ -36,7 +36,11 @@ test('chaque cadence a un id unique, et son id correspond à sa base et à son i
   const ids = CADENCES.map((cadence) => cadence.id);
   assert.equal(new Set(ids).size, ids.length);
 
-  for (const cadence of CADENCES) {
+  // Quotidien : 24 h pour chaque coup, sans incrément (son id n'a pas la forme « minutes+secondes »).
+  const quotidiennes = CADENCES.filter((cadence) => cadence.categorie === 'quotidien');
+  assert.deepEqual(quotidiennes, [{ id: 'quotidien', categorie: 'quotidien', base: 86400, increment: 0 }]);
+
+  for (const cadence of CADENCES.filter((c) => c.categorie !== 'quotidien')) {
     // « 3+2 » : 3 minutes de base, 2 secondes ajoutées à chaque coup
     const [minutes, secondes] = cadence.id.split('+').map(Number);
     assert.equal(cadence.base, minutes * 60, cadence.id);

@@ -1,5 +1,5 @@
 // Les seules cadences possibles. Le client envoie un id de cette liste, jamais un temps.
-// base et incrément sont en secondes. Quotidien sera ajoutée par #66.
+// base et incrément sont en secondes. Pour quotidien, base est le temps par coup (24 h), pas le temps de la partie.
 const CADENCES = [
   { id: '1+0', categorie: 'bullet', base: 60, increment: 0 },
   { id: '2+1', categorie: 'bullet', base: 120, increment: 1 },
@@ -11,10 +11,21 @@ const CADENCES = [
   { id: '10+0', categorie: 'rapide', base: 600, increment: 0 },
   { id: '15+0', categorie: 'rapide', base: 900, increment: 0 },
   { id: '15+10', categorie: 'rapide', base: 900, increment: 10 },
+  { id: 'quotidien', categorie: 'quotidien', base: 86400, increment: 0 },
 ];
 
 function trouverCadence(id) {
   return CADENCES.find((cadence) => cadence.id === id);
 }
 
-module.exports = { CADENCES, trouverCadence };
+// Date limite du prochain coup : dans 24 h pour une partie quotidienne, aucune sinon.
+// maintenant est un paramètre pour pouvoir le fixer dans les tests.
+function prochaineEcheance(cadenceId, maintenant = new Date()) {
+  const cadence = trouverCadence(cadenceId);
+  if (cadence.categorie === 'quotidien') {
+    return new Date(maintenant.getTime() + cadence.base * 1000).toISOString();
+  }
+  return null;
+}
+
+module.exports = { CADENCES, trouverCadence, prochaineEcheance };

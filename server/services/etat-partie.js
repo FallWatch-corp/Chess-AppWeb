@@ -26,6 +26,8 @@ function etatPartie(partie, joueurId) {
     coups: listerCoups(id),
     fin: finPublique(partie),
     cadence: trouverCadence(partie.cadence),
+    // date limite du prochain coup en quotidien (texte ISO), null sinon
+    echeance: partie.echeance,
   };
 }
 
