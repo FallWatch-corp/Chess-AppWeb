@@ -11,6 +11,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET}
       URL_API: ${URL_API}
       URL_CLIENT: ${URL_CLIENT}
+      NODE_ENV: ${NODE_ENV:-development}
 
   client:
     image: ghcr.io/${COMPTE}/chess-appweb-client:${TAG}
