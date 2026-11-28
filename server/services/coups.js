@@ -31,7 +31,7 @@ function causeDeNulle(echecs) {
 
 // Le serveur est l'arbitre : on repart toujours de la FEN en base,
 // jamais de ce que le client croit voir.
-function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}) {
+function jouerCoup(partieId, joueurId, { de, vers, promotion, numero } = {}) {
   const partie = trouverPartieParId(partieId);
   if (!partie) {
     throw new ErreurApi(404, 'Partie introuvable.');
@@ -48,6 +48,12 @@ function jouerCoup(partieId, joueurId, { de, vers, promotion } = {}) {
   }
   if (!CASE.test(de ?? '') || !CASE.test(vers ?? '') || (promotion !== undefined && !PROMOTIONS.includes(promotion))) {
     throw new ErreurApi(400, 'Coup mal formé : il faut une case de départ et une case d\'arrivée (ex. e2, e4).');
+  }
+  if (numero !== undefined && !(Number.isInteger(numero) && numero >= 0)) {
+    throw new ErreurApi(400, 'Numéro de coup invalide.');
+  }
+  if (numero !== undefined && numero !== listerCoups(partie.id).length) {
+    throw new ErreurApi(409, 'La position a changé, rechargez la partie.');
   }
 
   const echecs = chargerPosition(partie);

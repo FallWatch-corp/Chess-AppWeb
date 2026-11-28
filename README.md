@@ -247,12 +247,21 @@ L'affichage de l'échiquier est confié à une autre bibliothèque, `react-chess
 
 **Le serveur est l'arbitre.** Le client ne décide jamais si un coup est légal.
 
-1. Le joueur dépose une pièce : le client envoie `POST /api/parties/:id/coups` avec `{ de: "e2", vers: "e4" }` (et `promotion: "q"` pour un pion qui arrive au bout).
+1. Le joueur dépose une pièce : le client envoie `POST /api/parties/:id/coups` avec `{ de: "e2", vers: "e4", numero: 0 }` (et `promotion: "q"` pour un pion qui arrive au bout). `numero` est le nombre de coups que le joueur voyait sur sa page quand il a joué.
 2. Le serveur (`server/services/coups.js`) relit la partie en base et recrée la position avec `new Chess(partie.fen)`. On repart toujours de la FEN en base, jamais de ce qu'envoie le client.
-3. Il vérifie, dans cet ordre : la partie existe (`404`), le joueur y participe (`403`), la partie est en cours (`409` « La partie est terminée. »), le coup est bien formé (`400`), c'est son tour avec `chess.turn()` (`409` « Ce n'est pas votre tour. »).
+3. Il vérifie, dans cet ordre : la partie existe (`404`), le joueur y participe (`403`), la partie est en cours (`409` « La partie est terminée. »), le coup est bien formé (`400`), `numero` est un entier positif (`400`) égal au nombre de coups en base (`409` « La position a changé, rechargez la partie. »), c'est son tour avec `chess.turn()` (`409` « Ce n'est pas votre tour. »).
 4. Il joue le coup avec `chess.move({ from, to, promotion })`. Si le coup est illégal, chess.js lance une exception et l'API répond `422` « Coup illégal. ».
 5. La nouvelle FEN (`chess.fen()`) et le coup en SAN sont enregistrés **dans une même transaction** (`server/repository/parties.js`, `enregistrerCoup`) : la ligne de `parties` est mise à jour et une ligne est ajoutée dans `coups`. Si l'un échoue, rien n'est enregistré.
 6. La mise à jour porte la condition `WHERE fen = <ancienne FEN>` : si deux coups arrivent en même temps sur la même position, un seul est accepté.
+
+### Deux actions en même temps
+
+Deux actions simultanées ne peuvent pas casser une partie (`server/tests/actions-simultanees.test.js`) :
+
+- **Coup sur une position périmée.** Avec deux onglets ouverts (permis, voir la présence), un joueur pourrait jouer dans un onglet qui n'a pas encore reçu le dernier coup. Le client envoie `numero` : si la partie a avancé depuis, le coup est refusé (`409`) au lieu d'être joué sur une position que le joueur n'a pas vue. `numero` est facultatif pour l'API, mais notre client l'envoie toujours.
+- **Deux coups en même temps.** Le `UPDATE ... WHERE fen = <ancienne FEN>` et l'ajout du coup sont dans la même transaction : le second coup ne trouve plus l'ancienne FEN, rien n'est enregistré, l'API répond `409`. La FEN contient le numéro du coup et le camp au trait, donc deux moments différents de la partie n'ont jamais la même FEN.
+- **Un abandon et un mat en même temps.** Les deux passent par `enregistrerFinDePartie`, dont le `UPDATE` porte `WHERE statut = 'en_cours'`. Le résultat, la cause et les deux Elo sont écrits dans la même transaction : le second trouve la partie terminée, ne modifie rien et l'API répond `409`. Il y a donc un seul résultat et une seule mise à jour des Elo.
+- Node exécute une requête à la fois, et `node:sqlite` est synchrone : entre la lecture de la partie et son `UPDATE`, aucune autre requête ne peut passer. Les conditions dans le `UPDATE` restent la vraie garantie, et les tests la vérifient en préparant deux actions sur la même partie lue, avant que l'une des deux soit enregistrée.
 
 Comme la position et la liste des coups sont en base, une partie survit à un redémarrage du serveur.
 
